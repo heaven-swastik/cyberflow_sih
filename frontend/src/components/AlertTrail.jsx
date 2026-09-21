@@ -277,6 +277,11 @@ function AlertTrailContent({ caseId, onGenerate }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)' }}>
                         <span>prev:</span> {renderHash(alert.prev_hash, `prev-${alert.alert_id}`)}
                       </div>
+                      {alert.blockchain_tx && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent)', marginTop: '4px' }}>
+                          <span>chain_tx:</span> {renderHash(alert.blockchain_tx, `chain-${alert.alert_id}`)}
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

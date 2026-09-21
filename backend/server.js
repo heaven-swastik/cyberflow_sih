@@ -195,6 +195,24 @@ app.post('/api/cases/:case_id/simulate', authenticateToken, (req, res) => {
   res.json(data.simulations[caseId][zone_id]);
 });
 
+// Helper to call blockchain CLI
+function runBlockchainCli(action, ...args) {
+  const pythonCommand = resolvePythonCommand();
+  const res = spawnSync(pythonCommand, ['blockchain_cli.py', action, ...args], {
+    cwd: AI_ENGINE_DIR, encoding: 'utf-8'
+  });
+  if (res.error || res.status !== 0) {
+    console.error(`Blockchain CLI error (${action}):`, res.stderr);
+    return null;
+  }
+  try {
+    return JSON.parse(res.stdout);
+  } catch(e) {
+    console.error(`Blockchain JSON parse error (${action}):`, e.message);
+    return null;
+  }
+}
+
 app.post('/api/cases/:case_id/alert', authenticateToken, (req, res) => {
   const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
   if (!c) return res.status(404).json({ error: "case not found" });
@@ -243,11 +261,36 @@ app.post('/api/cases/:case_id/alert', authenticateToken, (req, res) => {
   const newAlert = { ...alertFields, prev_hash, hash };
   data.alerts.push(newAlert);
 
+  // Add to blockchain
+  const bcResult = runBlockchainCli('add', 'alert_dispatched', c.case_id, JSON.stringify(alertFields));
+  if (bcResult && bcResult.hash) {
+    newAlert.blockchain_tx = bcResult.hash;
+  }
+
   res.json(newAlert);
 });
 
 app.get('/api/alerts', authenticateToken, (req, res) => {
   res.json(data.alerts || []);
+});
+
+// ── Blockchain endpoints ──
+app.get('/api/blockchain', authenticateToken, (req, res) => {
+  const result = runBlockchainCli('get_all');
+  if (!result) return res.status(500).json({ error: "Failed to read blockchain" });
+  res.json(result);
+});
+
+app.get('/api/blockchain/verify', authenticateToken, (req, res) => {
+  const result = runBlockchainCli('verify');
+  if (!result) return res.status(500).json({ error: "Failed to verify blockchain" });
+  res.json(result);
+});
+
+app.get('/api/blockchain/stats', authenticateToken, (req, res) => {
+  const result = runBlockchainCli('get_stats');
+  if (!result) return res.status(500).json({ error: "Failed to read blockchain stats" });
+  res.json(result);
 });
 
 // ── Database endpoints ──
