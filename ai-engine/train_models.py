@@ -186,6 +186,44 @@ def train_all_models(data_path=None, output_dir=None, num_cases=300):
     print("--- Priority Classifier ---")
     print(classification_report(y_priority_test, y_priority_pred, target_names=PRIORITY_CLASSES, zero_division=0))
 
+    # Step 6: Train RL Q-Table
+    print("\n" + "=" * 60)
+    print("TRAINING RL OPTIMIZER (Q-LEARNING)")
+    print("=" * 60)
+    try:
+        from rl_optimizer import RLOptimizer, build_training_data_from_cases
+        print("[*] Loading transaction data for RL...")
+        
+        tx_path = os.path.join(data_dir, "training_transactions.csv")
+        if not os.path.exists(tx_path):
+            # Fallback if somehow missing
+            from generate_training_data import generate_training_dataset
+            generate_training_dataset(num_cases=num_cases, seed=42, output_dir=data_dir)
+            
+        tx_df = pd.read_csv(tx_path)
+        # Convert to list of dicts as expected by build_training_data_from_cases
+        txs = tx_df.to_dict('records')
+        
+        # Load fraud_types from the features file
+        feat_df = pd.read_csv(feat_path)
+        case_ids = feat_df['case_id'].tolist()
+        fraud_types = dict(zip(feat_df['case_id'], feat_df['fraud_type']))
+        
+        print(f"[*] Building sequential RL training sequences from {len(case_ids)} cases...")
+        rl_training_data = build_training_data_from_cases(txs, case_ids, fraud_types)
+        print(f"[*] Built {len(rl_training_data)} state transitions.")
+        
+        rl_opt = RLOptimizer()
+        print("[*] Running Q-learning... (50 epochs)")
+        rl_opt.train_on_dataset(rl_training_data, epochs=50)
+        
+        rl_model_path = os.path.join(output_dir, "rl_q_table.json")
+        rl_opt.save(rl_model_path)
+        print(f"[+] RL Q-Table saved to {rl_model_path}!")
+        print(f"    Total states learned: {len(rl_opt.q_table)}")
+        
+    except Exception as e:
+        print(f"[!] Error training RL module: {e}")
 
 if __name__ == "__main__":
     train_all_models()

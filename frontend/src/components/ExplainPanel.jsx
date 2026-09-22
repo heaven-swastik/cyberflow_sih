@@ -138,8 +138,11 @@ function ExplainContent({ caseData }) {
           </div>
 
           <div className="explain-feature-footnote">
-            Exact Shapley (SHAP) decomposition of THIS case's risk score, grouped by feature type. 
-            Red pushes the score up, green pulls it down. Hover over feature names for definitions.
+            <p>Exact Shapley (SHAP) decomposition of THIS case's risk score, grouped by feature type. 
+            Red pushes the score up, green pulls it down. Hover over feature names for definitions.</p>
+            <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
+              <em>Note: The Reinforcement Learning (RL) investigation recommendations and the Path Predictor are independent signals operating on different timescales (sequential graph exploration vs multi-stage outcome prediction).</em>
+            </p>
           </div>
         </>
       )}

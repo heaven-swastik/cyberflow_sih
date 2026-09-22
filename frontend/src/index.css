@@ -5717,3 +5717,25 @@ textarea.cf-input {
 .explain-feature-row.wider .explain-feature-fill {
   height: 8px;
 }
+
+/* Priority 3: Graph Expanded Mode */
+.correlate-graph-container.expanded {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background-color: var(--bg-surface);
+  border: none;
+  border-radius: 0;
+  padding: 2rem;
+  padding-right: 400px; /* Leave space for NodeInspector drawer */
+}
+
+/* Adjust the button so it sits above the fixed graph when expanded */
+.graph-expanded-mode .correlate-header {
+  position: relative;
+  z-index: 1001; /* Ensure expand/collapse button is clickable */
+}
+

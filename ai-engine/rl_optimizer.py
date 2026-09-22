@@ -89,8 +89,33 @@ class RLOptimizer:
         self.training_episodes = 0
 
     def _get_q(self, state, action_idx):
-        """Get Q-value for a state-action pair."""
-        return self.q_table.get((state, action_idx), 0.0)
+        """Get Q-value for a state-action pair, with fallback to nearest known state."""
+        key = (state, action_idx)
+        if key in self.q_table:
+            return self.q_table[key]
+        
+        # If not in training data, find the closest state (by bucket distance) that HAS this action
+        best_dist = float('inf')
+        best_val = 0.0
+        
+        for (k_state, k_action), v in self.q_table.items():
+            if k_action == action_idx and k_state[0] == state[0]: # Must match current_state (e.g. consolidation)
+                # Calculate distance on the other buckets
+                dist = sum(abs(a - b) for a, b in zip(state[1:], k_state[1:]))
+                if dist < best_dist:
+                    best_dist = dist
+                    best_val = v
+                    
+        # If still nothing, match without requiring exact state[0]
+        if best_dist == float('inf'):
+            for (k_state, k_action), v in self.q_table.items():
+                if k_action == action_idx:
+                    dist = sum(abs(a - b) for a, b in zip(state, k_state))
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_val = v
+                        
+        return best_val
 
     def _set_q(self, state, action_idx, value):
         """Set Q-value for a state-action pair."""

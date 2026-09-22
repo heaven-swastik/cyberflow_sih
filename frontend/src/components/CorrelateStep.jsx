@@ -36,9 +36,11 @@ const CorrelateStep = ({
   onFreezeNode,
   autoPlayTimeline
 }) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
   return (
     <ErrorBoundary>
-    <div className="correlate-step">
+    <div className={`correlate-step ${isExpanded ? 'graph-expanded-mode' : ''}`}>
       <div className="correlate-header">
         <div>
           <div className="correlate-eyebrow">Step 02 / Relationship intelligence</div>
@@ -48,13 +50,31 @@ const CorrelateStep = ({
             Each node is a database record and each edge is a transaction.
           </p>
         </div>
-        <div className="correlate-status">
-          <span className="correlate-status-dot" />
-          <span>LIVE CASE GRAPH</span>
+        <div className="correlate-status" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="correlate-status-dot" />
+            <span>LIVE CASE GRAPH</span>
+          </div>
+          <button 
+            className="btn btn-secondary" 
+            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? '✕ Collapse' : '⛶ Expand'}
+          </button>
         </div>
       </div>
 
-      <div className="correlate-graph-container">
+      <div className={`correlate-graph-container ${isExpanded ? 'expanded' : ''}`}>
+        {isExpanded && (
+          <button 
+            className="btn btn-secondary"
+            style={{ position: 'absolute', top: '20px', right: '400px', zIndex: 1001, background: '#13231f', border: '1px solid rgba(65, 220, 143, 0.2)' }}
+            onClick={() => setIsExpanded(false)}
+          >
+            ✕ Exit Fullscreen
+          </button>
+        )}
         <aside className="graph-context-rail">
           <span className="graph-rail-label">Trace direction</span>
           <div className="graph-trace-path">

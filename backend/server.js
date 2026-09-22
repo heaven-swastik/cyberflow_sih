@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -7,6 +8,8 @@ const { spawnSync } = require('child_process');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(cors({
@@ -97,37 +100,54 @@ const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardH
 const complaintLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Too many complaints submitted. Try again later.' } });
 app.use('/api/', generalLimiter);
 
-// Firebase Admin SDK — initialized lazily when credentials are available
-let firebaseAdmin = null;
-try {
-  const admin = require('firebase-admin');
-  if (process.env.FIREBASE_PROJECT_ID) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-      }),
-    });
-    firebaseAdmin = admin;
-    console.log('[+] Firebase Admin SDK initialized — JWT verification enabled.');
-  } else {
-    console.log('[!] FIREBASE_PROJECT_ID not set — running without JWT verification (demo mode).');
+// Local authentication store. Passwords are only persisted as bcrypt hashes.
+const AUTH_SECRET = process.env.JWT_SECRET || 'cyberflow-development-secret-change-me';
+const USERS_FILE = process.env.AUTH_USERS_FILE || path.join(__dirname, 'users.json');
+let users = [];
+
+function loadUsers() {
+  try {
+    users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
+  } catch (_) {
+    users = [];
   }
-} catch (err) {
-  console.warn('[!] Firebase Admin not available:', err.message);
+
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD && !users.some((user) => user.email === process.env.ADMIN_EMAIL.toLowerCase())) {
+    users.push({
+      id: crypto.randomUUID(),
+      email: process.env.ADMIN_EMAIL.toLowerCase(),
+      displayName: process.env.ADMIN_NAME || 'CyberFlow Administrator',
+      role: 'admin',
+      passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 12),
+      createdAt: new Date().toISOString(),
+    });
+    saveUsers();
+  }
 }
 
-// JWT verification middleware — passes through if Firebase Admin is not configured (demo mode)
-async function authenticateToken(req, res, next) {
-  if (!firebaseAdmin) return next(); // Demo mode: no auth required
+function saveUsers() {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function publicUser(user) {
+  return { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
+}
+
+function createToken(user) {
+  return jwt.sign({ sub: user.id, email: user.email, role: user.role, displayName: user.displayName }, AUTH_SECRET, { expiresIn: '8h' });
+}
+
+loadUsers();
+
+// Every protected API requires a locally signed JWT.
+function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
   try {
     const token = authHeader.split('Bearer ')[1];
-    req.user = await firebaseAdmin.auth().verifyIdToken(token);
+    req.user = jwt.verify(token, AUTH_SECRET);
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -136,17 +156,59 @@ async function authenticateToken(req, res, next) {
 
 function requireRole(...roles) {
   return (req, res, next) => {
-    if (!firebaseAdmin) return next(); // Demo mode
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-    // For now, all authenticated users have access — role checking via Firestore custom claims
-    // can be added later without changing this middleware signature
+    if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Insufficient permissions' });
     next();
   };
 }
 
+app.post('/api/auth/register',
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('displayName').optional().isString().trim().isLength({ max: 100 }),
+  (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+    const email = req.body.email.toLowerCase();
+    if (users.some((user) => user.email === email)) return res.status(409).json({ error: 'An account with this email already exists' });
+
+    const user = {
+      id: crypto.randomUUID(),
+      email,
+      displayName: req.body.displayName || email.split('@')[0],
+      role: 'complainant',
+      passwordHash: bcrypt.hashSync(req.body.password, 12),
+      createdAt: new Date().toISOString(),
+    };
+    users.push(user);
+    saveUsers();
+    res.status(201).json({ token: createToken(user), user: publicUser(user) });
+  }
+);
+
+app.post('/api/auth/login',
+  body('email').isEmail().normalizeEmail(),
+  body('password').isString().notEmpty(),
+  (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Email and password are required' });
+    const user = users.find((candidate) => candidate.email === req.body.email.toLowerCase());
+    if (!user || !bcrypt.compareSync(req.body.password, user.passwordHash)) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    res.json({ token: createToken(user), user: publicUser(user) });
+  }
+);
+
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+  const user = users.find((candidate) => candidate.id === req.user.sub);
+  if (!user) return res.status(401).json({ error: 'Account no longer exists' });
+  res.json({ user: publicUser(user) });
+});
+
 // ── API Endpoints ──
 
-app.get('/api/overview', authenticateToken, (req, res) => {
+app.get('/api/overview', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const cases = data.cases || [];
   const active_cases = cases.length;
   const high_priority = cases.filter(c => c.intervention_priority === 'HIGH').length;
@@ -156,35 +218,47 @@ app.get('/api/overview', authenticateToken, (req, res) => {
   res.json({ active_cases, high_priority, predicted_cashout, potential_exposure_inr });
 });
 
-app.get('/api/cases', authenticateToken, (req, res) => {
+app.get('/api/cases', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   res.json(data.cases || []);
 });
 
 app.get('/api/cases/:case_id', authenticateToken, (req, res) => {
   const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
   if (!c) return res.status(404).json({ error: "case not found" });
+  // Complainants may only view their own cases
+  if (req.user.role === 'complainant' && c.complainant_id !== req.user.sub) {
+    return res.status(403).json({ error: 'You do not have access to this case' });
+  }
   res.json(c);
 });
 
-app.get('/api/cases/:case_id/graph', authenticateToken, (req, res) => {
+app.get('/api/my-cases', authenticateToken, (req, res) => {
+  if (req.user.role !== 'complainant') {
+    return res.status(403).json({ error: 'Endpoint only for complainants' });
+  }
+  const myCases = (data.cases || []).filter(c => c.complainant_id === req.user.sub);
+  res.json(myCases);
+});
+
+app.get('/api/cases/:case_id/graph', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const g = data.graphs ? data.graphs[req.params.case_id] : null;
   if (!g) return res.status(404).json({ error: "graph not found" });
   res.json(g);
 });
 
-app.get('/api/cases/:case_id/timeline', authenticateToken, (req, res) => {
+app.get('/api/cases/:case_id/timeline', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const t = data.timelines ? data.timelines[req.params.case_id] : null;
   if (!t) return res.status(404).json({ error: "timeline not found" });
   res.json(t);
 });
 
-app.get('/api/cases/:case_id/explanation', authenticateToken, (req, res) => {
+app.get('/api/cases/:case_id/explanation', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
   if (!c) return res.status(404).json({ error: "case not found" });
   res.json({ case_id: c.case_id, explanation: c.explanation || [] });
 });
 
-app.post('/api/cases/:case_id/simulate', authenticateToken, (req, res) => {
+app.post('/api/cases/:case_id/simulate', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const { zone_id } = req.body;
   const caseId = req.params.case_id;
 
@@ -213,7 +287,7 @@ function runBlockchainCli(action, ...args) {
   }
 }
 
-app.post('/api/cases/:case_id/alert', authenticateToken, (req, res) => {
+app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
   if (!c) return res.status(404).json({ error: "case not found" });
 
@@ -270,40 +344,40 @@ app.post('/api/cases/:case_id/alert', authenticateToken, (req, res) => {
   res.json(newAlert);
 });
 
-app.get('/api/alerts', authenticateToken, (req, res) => {
+app.get('/api/alerts', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   res.json(data.alerts || []);
 });
 
 // ── Blockchain endpoints ──
-app.get('/api/blockchain', authenticateToken, (req, res) => {
+app.get('/api/blockchain', authenticateToken, requireRole('admin'), (req, res) => {
   const result = runBlockchainCli('get_all');
   if (!result) return res.status(500).json({ error: "Failed to read blockchain" });
   res.json(result);
 });
 
-app.get('/api/blockchain/verify', authenticateToken, (req, res) => {
+app.get('/api/blockchain/verify', authenticateToken, requireRole('admin'), (req, res) => {
   const result = runBlockchainCli('verify');
   if (!result) return res.status(500).json({ error: "Failed to verify blockchain" });
   res.json(result);
 });
 
-app.get('/api/blockchain/stats', authenticateToken, (req, res) => {
+app.get('/api/blockchain/stats', authenticateToken, requireRole('admin'), (req, res) => {
   const result = runBlockchainCli('get_stats');
   if (!result) return res.status(500).json({ error: "Failed to read blockchain stats" });
   res.json(result);
 });
 
 // ── Database endpoints ──
-app.get('/api/db/schema', authenticateToken, (req, res) => {
+app.get('/api/db/schema', authenticateToken, requireRole('admin'), (req, res) => {
   res.type('text/plain').send(dbSchemaText);
 });
 
-app.get('/api/db/preview', authenticateToken, (req, res) => {
+app.get('/api/db/preview', authenticateToken, requireRole('admin'), (req, res) => {
   res.json(dbPreview);
 });
 
 // ── Live Feed endpoint ──
-app.get('/api/feed', authenticateToken, (req, res) => {
+app.get('/api/feed', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const count = Math.min(parseInt(req.query.count) || 5, 20);
   const events = Array.from({ length: count }, () => generateFeedEvent());
   res.json(events);
@@ -313,14 +387,14 @@ app.get('/api/feed', authenticateToken, (req, res) => {
 // Served directly from case_export.json, which is produced by
 // ai-engine/pipeline.py -> feature_analysis.py / evaluation.py.
 // Nothing is computed or invented in this layer — it's a static read.
-app.get('/api/feature-analysis', authenticateToken, (req, res) => {
+app.get('/api/feature-analysis', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   if (!data.feature_analysis) {
     return res.status(404).json({ error: "feature analysis not available — run ai-engine/pipeline.py" });
   }
   res.json(data.feature_analysis);
 });
 
-app.get('/api/evaluation', authenticateToken, (req, res) => {
+app.get('/api/evaluation', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   if (!data.evaluation_report) {
     return res.status(404).json({ error: "evaluation report not available — run ai-engine/pipeline.py" });
   }
@@ -328,7 +402,7 @@ app.get('/api/evaluation', authenticateToken, (req, res) => {
 });
 
 // ── Data Validation endpoint (requirement 3) ──
-app.get('/api/cases/:case_id/validation', authenticateToken, (req, res) => {
+app.get('/api/cases/:case_id/validation', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const v = data.data_validation ? data.data_validation[req.params.case_id] : null;
   if (!v) return res.status(404).json({ error: "validation report not found for this case" });
   res.json(v);
@@ -384,6 +458,9 @@ app.post('/api/complaints',
     }
     const complaint = req.body || {};
 
+  // Inject the authenticated user's ID so we can enforce ownership later
+  complaint._complainant_id = req.user.sub;
+
   const result = runComplaintIntake(complaint);
 
   if (result.error) {
@@ -402,6 +479,11 @@ app.post('/api/complaints',
 
   if (parsed.status === 'VALIDATION_FAILED') {
     return res.status(400).json(parsed);
+  }
+
+  // Stamp ownership on the case object before storing
+  if (parsed.case) {
+    parsed.case.complainant_id = req.user.sub;
   }
 
   // Fold the newly-generated case into the in-memory dataset so it

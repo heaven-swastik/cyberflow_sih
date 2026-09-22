@@ -170,6 +170,41 @@ def run_pipeline(output_dir=None):
     models_dir = os.path.join(base_dir, "models")
     engine = CyberFlowClassifierEngine(models_dir=models_dir)
 
+    # Step 2.5: Ensure RL Q-Table exists, train if missing
+    rl_model_path = os.path.join(models_dir, "rl_q_table.json")
+    if not os.path.exists(rl_model_path):
+        print("\n[2.5/7] RL Q-Table missing. Training RL Optimizer now...")
+        from train_models import train_all_models
+        # Just calling train_all_models will re-train XGBoost too, but that's fine for this context
+        # Alternatively we can just do the RL part. I will call train_all_models since it builds everything.
+        try:
+            from rl_optimizer import RLOptimizer, build_training_data_from_cases
+            import pandas as pd_local
+            tx_path = os.path.join(data_dir, "training_transactions.csv")
+            feat_path = os.path.join(data_dir, "training_features.csv")
+            if not os.path.exists(tx_path) or not os.path.exists(feat_path):
+                from generate_training_data import generate_training_dataset
+                generate_training_dataset(num_cases=300, seed=42, output_dir=data_dir)
+            
+            tx_df = pd_local.read_csv(tx_path)
+            rl_txs = tx_df.to_dict('records')
+            
+            feat_df = pd_local.read_csv(feat_path)
+            rl_cids = feat_df['case_id'].tolist()
+            rl_ftypes = dict(zip(feat_df['case_id'], feat_df['fraud_type']))
+            
+            rl_training_data = build_training_data_from_cases(rl_txs, rl_cids, rl_ftypes)
+            
+            rl_opt = RLOptimizer()
+            rl_opt.train_on_dataset(rl_training_data, epochs=50)
+            os.makedirs(models_dir, exist_ok=True)
+            rl_opt.save(rl_model_path)
+            print(f"  [+] RL training complete. Saved to {rl_model_path}")
+        except Exception as e:
+            print(f"  [!] Failed to train RL: {e}")
+    else:
+        print("\n[2.5/7] RL Q-Table found, skipping training.")
+
     # Step 3: Process each demo case through the full stage sequence
     case_ids = ["CF-1042", "CF-2001", "CF-3001"]
     fraud_types = {
