@@ -180,28 +180,47 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
     ctx.fillStyle = `${drawColor}${Math.floor(40 * (1 - pulseFactor)).toString(16).padStart(2, '0')}`;
     ctx.fill();
 
-    // Outer glow halo — gives each node a "signal" feel rather than a flat dot
-    const glowRadius = size * 2.6;
-    const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, glowRadius);
-    glow.addColorStop(0, `${drawColor}55`);
-    glow.addColorStop(1, `${drawColor}00`);
-    ctx.beginPath();
-    ctx.fillStyle = glow;
-    ctx.arc(node.x, node.y, glowRadius, 0, 2 * Math.PI);
-    ctx.fill();
+    let drawColorFilled = false;
+    try {
+      // Outer glow halo — gives each node a "signal" feel rather than a flat dot
+      const glowRadius = Number(size * 2.6);
+      if (glowRadius > 0 && Number.isFinite(glowRadius)) {
+        const glow = ctx.createRadialGradient(Number(node.x), Number(node.y), 0, Number(node.x), Number(node.y), glowRadius);
+        glow.addColorStop(0, `${drawColor}55`);
+        glow.addColorStop(1, `${drawColor}00`);
+        ctx.beginPath();
+        ctx.fillStyle = glow;
+        ctx.arc(node.x, node.y, glowRadius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
 
-    // Core circle with a subtle radial shade for depth (flat -> spherical)
-    const core = ctx.createRadialGradient(
-      node.x - size * 0.35, node.y - size * 0.35, size * 0.15,
-      node.x, node.y, size
-    );
-    core.addColorStop(0, lighten(drawColor, 0.35));
-    core.addColorStop(1, drawColor);
+      // Core circle with a subtle radial shade for depth (flat -> spherical)
+      const r0 = Number(size * 0.15);
+      const r1 = Number(size);
+      if (r0 >= 0 && r1 >= 0 && Number.isFinite(r0) && Number.isFinite(r1)) {
+        const core = ctx.createRadialGradient(
+          Number(node.x - size * 0.35), Number(node.y - size * 0.35), r0,
+          Number(node.x), Number(node.y), r1
+        );
+        core.addColorStop(0, lighten(drawColor, 0.35));
+        core.addColorStop(1, drawColor);
 
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-    ctx.fillStyle = core;
-    ctx.fill();
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+        ctx.fillStyle = core;
+        ctx.fill();
+        drawColorFilled = true;
+      }
+    } catch (e) {
+      console.warn("Gradient error:", e, node);
+    }
+    
+    if (!drawColorFilled) {
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+      ctx.fillStyle = drawColor;
+      ctx.fill();
+    }
 
     // Crisp border
     ctx.strokeStyle = isFrozen ? '#ffffff' : `${drawColor}99`;

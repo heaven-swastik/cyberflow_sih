@@ -2,7 +2,7 @@
  * CyberFlow — Authentication Context
  *
  * Provides app-wide auth state (user, role, loading) via React Context.
- * Roles are stored in Firestore document `users/{uid}` and cached locally.
+ * Auth state is backed by the local backend JWT and cached locally.
  *
  * Three roles:
  *   admin        — Full dashboard + user management
@@ -10,20 +10,6 @@
  *   complainant  — File + track own complaints only
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import {
-  auth,
-  db,
-  googleProvider,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-  updateProfile,
-  doc,
-  getDoc,
-  setDoc,
-} from '../firebase';
 
 const AuthContext = createContext(null);
 
@@ -33,95 +19,79 @@ export function useAuth() {
   return ctx;
 }
 
-// Default role for newly registered users
-const DEFAULT_ROLE = 'complainant';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
+const TOKEN_KEY = 'cyberflow_token';
+const USER_KEY = 'cyberflow_user';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem(USER_KEY) || 'null'));
+  const [role, setRole] = useState(() => JSON.parse(localStorage.getItem(USER_KEY) || 'null')?.role || null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch role from Firestore (or create default entry for new users)
-  const fetchRole = useCallback(async (firebaseUser) => {
-    if (!firebaseUser) {
-      setRole(null);
-      return null;
-    }
-    try {
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        const r = snap.data().role || DEFAULT_ROLE;
-        setRole(r);
-        return r;
-      }
-      // First login — create user document with default role
-      const newDoc = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || '',
-        role: DEFAULT_ROLE,
-        createdAt: new Date().toISOString(),
-        caseIds: [],
-      };
-      await setDoc(userRef, newDoc);
-      setRole(DEFAULT_ROLE);
-      return DEFAULT_ROLE;
-    } catch (err) {
-      console.error('[Auth] Failed to fetch role from Firestore:', err);
-      // Fallback: if Firestore is unreachable (e.g. no project yet),
-      // grant officer role so the demo remains functional.
-      setRole('officer');
-      return 'officer';
-    }
-  }, []);
-
-  // Listen for auth state changes
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        await fetchRole(firebaseUser);
-      } else {
-        setRole(null);
-      }
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      setUser(null);
+      setRole(null);
       setLoading(false);
-    });
-    return unsub;
-  }, [fetchRole]);
+      return;
+    }
+    fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((response) => {
+        if (!response.ok) throw new Error('Session expired');
+        return response.json();
+      })
+      .then(({ user: currentUser }) => {
+        setUser(currentUser);
+        setRole(currentUser.role);
+        localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+      })
+      .catch(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        setUser(null);
+        setRole(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   // ── Auth actions ──
 
   const login = useCallback(async (email, password) => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    await fetchRole(cred.user);
-    return cred.user;
-  }, [fetchRole]);
-
-  const loginWithGoogle = useCallback(async () => {
-    const cred = await signInWithPopup(auth, googleProvider);
-    await fetchRole(cred.user);
-    return cred.user;
-  }, [fetchRole]);
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Authentication failed');
+    localStorage.setItem(TOKEN_KEY, result.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    setUser(result.user);
+    setRole(result.user.role);
+    return result.user;
+  }, []);
 
   const signup = useCallback(async (email, password, displayName) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    if (displayName) {
-      await updateProfile(cred.user, { displayName });
-    }
-    await fetchRole(cred.user);
-    return cred.user;
-  }, [fetchRole]);
+    const response = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, displayName }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Registration failed');
+    localStorage.setItem(TOKEN_KEY, result.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    setUser(result.user);
+    setRole(result.user.role);
+    return result.user;
+  }, []);
 
   const logout = useCallback(async () => {
-    await firebaseSignOut(auth);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     setUser(null);
     setRole(null);
   }, []);
 
   const getIdToken = useCallback(async () => {
-    if (!user) return null;
-    return user.getIdToken();
+    return user ? localStorage.getItem(TOKEN_KEY) : null;
   }, [user]);
 
   // ── Convenience booleans ──
@@ -140,7 +110,6 @@ export function AuthProvider({ children }) {
     isOfficer,
     isComplainant,
     login,
-    loginWithGoogle,
     signup,
     logout,
     getIdToken,
