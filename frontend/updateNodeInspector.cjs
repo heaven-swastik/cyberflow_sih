@@ -1,137 +1,8 @@
-import { useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { formatINR } from '../utils/format';
+const fs = require('fs');
+const path = 'e:/projects/CyberFlow_SIH_final - Copy/frontend/src/components/NodeInspector.jsx';
+let content = fs.readFileSync(path, 'utf8');
 
-function MiniGraph({ centerNode, edges, nodes }) {
-  const neighbors = useMemo(() => {
-    const connectedEdges = edges.filter(e => {
-      const srcId = typeof e.source === 'object' ? e.source.id : e.source;
-      const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
-      return srcId === centerNode.id || tgtId === centerNode.id;
-    });
-
-    const neighborIds = new Set();
-    connectedEdges.forEach(e => {
-      const srcId = typeof e.source === 'object' ? e.source.id : e.source;
-      const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
-      neighborIds.add(srcId);
-      neighborIds.add(tgtId);
-    });
-
-    return nodes.filter(n => neighborIds.has(n.id));
-  }, [centerNode, edges, nodes]);
-
-  // Simple SVG layout: center node in middle, others in a circle
-  const cx = 150;
-  const cy = 100;
-  const r = 60;
-  
-  const others = neighbors.filter(n => n.id !== centerNode.id);
-  const placedOthers = others.map((n, i) => {
-    const angle = (i / others.length) * 2 * Math.PI - Math.PI / 2;
-    return {
-      ...n,
-      cx: cx + r * Math.cos(angle),
-      cy: cy + r * Math.sin(angle)
-    };
-  });
-
-  const allPlaced = [{...centerNode, cx, cy}, ...placedOthers];
-
-  const lines = [];
-  edges.forEach(e => {
-    const srcId = typeof e.source === 'object' ? e.source.id : e.source;
-    const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
-    
-    const s = allPlaced.find(n => n.id === srcId);
-    const t = allPlaced.find(n => n.id === tgtId);
-    if (s && t && (srcId === centerNode.id || tgtId === centerNode.id)) {
-      lines.push({ x1: s.cx, y1: s.cy, x2: t.cx, y2: t.cy, key: `${srcId}-${tgtId}` });
-    }
-  });
-
-  const getColor = (type) => {
-    const colors = {
-      complaint: '#5b8fd6',
-      victim: '#e4483f',
-      account: '#8a9390',
-      merchant: '#d4b02a',
-      device: '#5b8fd6',
-      atm: '#e2954a',
-      zone: '#8a9390',
-    };
-    return colors[type] || '#8a9390';
-  };
-
-  return (
-    <div className="node-drawer-minigraph">
-      <div className="node-drawer-minigraph-title">1-Hop Neighborhood</div>
-      <svg width="100%" height="200" viewBox="0 0 300 200">
-        {lines.map((l, i) => (
-          <line key={l.key + i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(65, 220, 143, 0.20)" strokeWidth="2" />
-        ))}
-        {allPlaced.map(n => (
-          <g key={n.id}>
-            <circle cx={n.cx} cy={n.cy} r={n.id === centerNode.id ? 8 : 5} fill={getColor(n.type)} />
-            <text x={n.cx} y={n.cy + 15} fill="#8a9390" fontSize="10" textAnchor="middle">{n.label || n.id}</text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-export default function NodeInspector({ node, graphData, onClose, onFreeze, onFlag }) {
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  if (!node) return null;
-
-  const edges = graphData?.edges || [];
-  const nodes = graphData?.nodes || [];
-
-  const renderContent = () => {
-    if (['account', 'victim', 'merchant'].includes(node.type)) {
-      const incomingEdges = edges.filter(e => {
-        const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
-        return tgtId === node.id;
-      });
-      const outgoingEdges = edges.filter(e => {
-        const srcId = typeof e.source === 'object' ? e.source.id : e.source;
-        return srcId === node.id;
-      });
-
-      const totalInflow = incomingEdges.reduce((sum, e) => sum + (e.amount || 0), 0);
-      const totalOutflow = outgoingEdges.reduce((sum, e) => sum + (e.amount || 0), 0);
-      const netFlow = totalInflow - totalOutflow;
-
-      const connectedAccounts = new Set();
-      incomingEdges.forEach(e => connectedAccounts.add(typeof e.source === 'object' ? e.source.id : e.source));
-      outgoingEdges.forEach(e => connectedAccounts.add(typeof e.target === 'object' ? e.target.id : e.target));
-
-      const banks = ['HDFC', 'SBI', 'ICICI', 'Axis', 'PNB', 'Kotak'];
-      const bankHash = node.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      let bankName = banks[bankHash % banks.length];
-      if (node.label && node.label.includes('Bank')) bankName = node.label;
-
-      const isSink = outgoingEdges.length === 0 && incomingEdges.length > 0;
-      const highFanIn = incomingEdges.length >= 3;
-
-      let typeBadge = node.type;
-      if (node.type === 'account') {
-        if (isSink) typeBadge = 'terminal';
-        else if (highFanIn && outgoingEdges.length > 0) typeBadge = 'hub';
-        else typeBadge = 'mule';
-      }
-
-      const allRelatedEdges = [...incomingEdges, ...outgoingEdges].sort((a, b) => (b.amount || 0) - (a.amount || 0));
-
-        return (
+const replacement = `        return (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', padding: '0 4px' }}>
               <div>
@@ -195,7 +66,7 @@ export default function NodeInspector({ node, graphData, onClose, onFreeze, onFl
                       const tgt = typeof e.target === 'object' ? e.target.id : e.target;
                       return (
                         <tr key={i}>
-                          <td className="monospace" title={`${src} → ${tgt}`}>
+                          <td className="monospace" title={\`\${src} → \${tgt}\`}>
                             {src.slice(0, 4)}... → {tgt.slice(0, 4)}...
                           </td>
                           <td>{formatINR(e.amount)}</td>
@@ -281,7 +152,7 @@ export default function NodeInspector({ node, graphData, onClose, onFreeze, onFl
                 <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#41dc8f' }}>{conf}%</span>
               </div>
               <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: '#41dc8f', width: `${conf}%`, borderRadius: 3 }} />
+                <div style={{ height: '100%', background: '#41dc8f', width: \`\${conf}%\`, borderRadius: 3 }} />
               </div>
             </div>
             
@@ -299,44 +170,26 @@ export default function NodeInspector({ node, graphData, onClose, onFreeze, onFl
           </div>
         );
       }
+`;
 
-    return null;
-  };
+const lines = content.split('\n');
+const startIdx = lines.findIndex((l, i) => l.includes('return (') && lines[i+1]?.includes('<>'));
+let endIdx = -1;
+for (let i = startIdx + 1; i < lines.length; i++) {
+  if (lines[i].includes('return null;')) {
+    endIdx = i;
+    break;
+  }
+}
 
-  const getEmoji = (type) => {
-    switch (type) {
-      case 'complaint': return '📄';
-      case 'victim': return '👤';
-      case 'account': return '🏦';
-      case 'merchant': return '🏪';
-      case 'device': return '📱';
-      case 'atm': return '🏧';
-      case 'zone': return '📍';
-      default: return '🔘';
-    }
-  };
-
-  return (
-    <motion.div 
-      className="node-drawer"
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-    >
-      <div className="node-drawer-header">
-        <div className="node-drawer-title">
-          <span className="node-drawer-emoji">{getEmoji(node.type)}</span>
-          <span className="node-drawer-node-label">{node.label || node.type.toUpperCase()}</span>
-        </div>
-        <button className="node-drawer-close" onClick={onClose}>×</button>
-      </div>
-      <div className="node-drawer-body">
-        {renderContent()}
-      </div>
-      <div className="node-drawer-footer">
-        <MiniGraph centerNode={node} edges={edges} nodes={nodes} />
-      </div>
-    </motion.div>
-  );
+if (startIdx !== -1 && endIdx !== -1) {
+  const newLines = [
+    ...lines.slice(0, startIdx),
+    replacement,
+    ...lines.slice(endIdx)
+  ];
+  fs.writeFileSync(path, newLines.join('\n'));
+  console.log('Successfully replaced node properties layout!');
+} else {
+  console.log('Could not find start or end index', startIdx, endIdx);
 }
