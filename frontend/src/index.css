@@ -5739,3 +5739,9 @@ textarea.cf-input {
   z-index: 1001; /* Ensure expand/collapse button is clickable */
 }
 
+
+/* MapLibre 3D marker pulse animation */
+@keyframes pulse-marker {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(65, 220, 143, 0.4), 0 0 8px rgba(65, 220, 143, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(65, 220, 143, 0), 0 0 20px rgba(65, 220, 143, 0.6); }
+}

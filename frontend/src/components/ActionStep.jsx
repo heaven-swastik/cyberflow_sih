@@ -129,6 +129,7 @@ const ActionStep = ({ caseId, caseData, onAlertGenerated }) => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.1, duration: 0.3 }}
+                style={{ borderLeft: `3px solid ${'#5b8fd6'}`, background: '#13231f', borderRadius: '0 8px 8px 0', padding: '0.75rem 1rem', fontSize: '0.875rem', color: '#f4f7f5' }}
               >
                 {insight}
               </motion.div>
@@ -140,36 +141,24 @@ const ActionStep = ({ caseId, caseData, onAlertGenerated }) => {
       {/* Section 3: Prediction Summary */}
       <div className="action-final-section">
         <h3 className="action-final-section-title">Prediction Summary</h3>
-        <div className="action-final-summary-grid">
-          <div className="action-final-summary-item">
-            <div className="action-final-label">PREDICTED ZONE</div>
-            <div className="action-final-value">
-              {topZone ? `${zoneLabel(topZone.zone_id)} (${formatPercent(topZone.confidence)})` : 'N/A'}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+          {[
+            { icon: '📍', label: 'PREDICTED ZONE', value: topZone ? `${zoneLabel(topZone.zone_id)} · ${formatPercent(topZone.confidence)}` : 'N/A', color: '#5b8fd6' },
+            { icon: '🏧', label: 'TOP ATM', value: topAtm ? topAtm.bank_name : 'N/A', sub: topAtm?.address, color: '#e2954a' },
+            { icon: '⏱️', label: 'TIME WINDOW', value: caseData.expected_window || caseData.expected_time_window_minutes ? `${caseData.expected_time_window_minutes?.[0]}–${caseData.expected_time_window_minutes?.[1]} min` : 'Immediate', color: '#41dc8f' },
+            { icon: '💰', label: 'EXPOSURE', value: formatINR(caseData.potential_exposure_inr), color: '#e4483f' },
+          ].map(tile => (
+            <div key={tile.label} style={{
+              background: '#13231f', border: '1px solid rgba(65,220,143,0.12)', borderRadius: 10, padding: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: '1rem' }}>{tile.icon}</span>
+                <span style={{ fontSize: '0.7rem', color: '#8a9390', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tile.label}</span>
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: tile.color, fontFamily: 'IBM Plex Mono, monospace' }}>{tile.value}</div>
+              {tile.sub && <div style={{ fontSize: '0.75rem', color: '#8a9390', marginTop: 2 }}>{tile.sub}</div>}
             </div>
-          </div>
-          <div className="action-final-summary-item">
-            <div className="action-final-label">TOP ATM CANDIDATE</div>
-            <div className="action-final-value">
-              {topAtm ? (
-                <>
-                  <div>{topAtm.bank}</div>
-                  <div className="action-final-subvalue">{topAtm.address}</div>
-                </>
-              ) : 'N/A'}
-            </div>
-          </div>
-          <div className="action-final-summary-item">
-            <div className="action-final-label">TIME WINDOW</div>
-            <div className="action-final-value">
-              {caseData.expected_window || 'Immediate (0-4 hours)'}
-            </div>
-          </div>
-          <div className="action-final-summary-item">
-            <div className="action-final-label">POTENTIAL EXPOSURE</div>
-            <div className="action-final-value action-final-exposure">
-              {formatINR(caseData.potential_exposure_inr)}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 

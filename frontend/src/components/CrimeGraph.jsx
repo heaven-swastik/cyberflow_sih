@@ -61,8 +61,23 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
   const [toastMessage, setToastMessage] = useState(null);
   const hasAutoFitRef = useRef(false);
 
+  const nodeFirstSeenRef = useRef({});
+  const [invalidatedNodes, setInvalidatedNodes] = useState(new Set());
+  const prevTimelineStepRef = useRef(timelineStep);
+  const prevVisibleNodesRef = useRef(new Set());
+
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    let raf;
+    const tick = () => { forceRender(n => n + 1); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   useEffect(() => {
     if (!caseId) return;
+    setInvalidatedNodes(new Set());
+    nodeFirstSeenRef.current = {};
     getGraph(caseId).then(setGraphData);
   }, [caseId]);
 
@@ -81,6 +96,32 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!graphData) return;
+    const step = timelineStep ?? maxStep ?? 999;
+    const visibleEdges = graphData.edges.filter((e) => (e.step || 1) <= step);
+    const visibleNodeIds = new Set();
+    visibleEdges.forEach((e) => {
+      visibleNodeIds.add(e.source.id || e.source);
+      visibleNodeIds.add(e.target.id || e.target);
+    });
+    if (visibleNodeIds.size === 0 && graphData.nodes.length > 0) {
+      visibleNodeIds.add(graphData.nodes[0].id);
+    }
+
+    if (timelineStep < prevTimelineStepRef.current) {
+      const newInvalidated = new Set(invalidatedNodes);
+      prevVisibleNodesRef.current.forEach(id => {
+        if (!visibleNodeIds.has(id)) {
+          newInvalidated.add(id);
+        }
+      });
+      setInvalidatedNodes(newInvalidated);
+    }
+    prevTimelineStepRef.current = timelineStep;
+    prevVisibleNodesRef.current = visibleNodeIds;
+  }, [timelineStep, graphData, maxStep, invalidatedNodes]);
+
   // Filter graph based on timeline step
   const filteredData = useMemo(() => {
     if (!graphData) return { nodes: [], links: [] };
@@ -89,8 +130,8 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
     const visibleEdges = graphData.edges.filter((e) => (e.step || 1) <= step);
     const visibleNodeIds = new Set();
     visibleEdges.forEach((e) => {
-      visibleNodeIds.add(e.source);
-      visibleNodeIds.add(e.target);
+      visibleNodeIds.add(e.source.id || e.source);
+      visibleNodeIds.add(e.target.id || e.target);
     });
 
     // Always show at least the first node
@@ -98,17 +139,31 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
       visibleNodeIds.add(graphData.nodes[0].id);
     }
 
-    return {
-      nodes: graphData.nodes
-        .filter((n) => visibleNodeIds.has(n.id))
-        .map((n) => ({ ...n })),
-      links: visibleEdges.map((e) => ({
+    const nodesToRenderIds = new Set([...visibleNodeIds, ...invalidatedNodes]);
+
+    const nodes = graphData.nodes
+      .filter((n) => nodesToRenderIds.has(n.id))
+      .map((n) => ({ ...n }));
+
+    const nowTs = Date.now();
+    nodes.forEach(n => {
+      if (visibleNodeIds.has(n.id) && !nodeFirstSeenRef.current[n.id]) {
+        nodeFirstSeenRef.current[n.id] = nowTs;
+      }
+    });
+
+    const links = graphData.edges
+      .filter(e => nodesToRenderIds.has(e.source.id || e.source) && nodesToRenderIds.has(e.target.id || e.target))
+      .filter(e => nodeFirstSeenRef.current[e.source.id || e.source] && nodeFirstSeenRef.current[e.target.id || e.target])
+      .map((e) => ({
         source: e.source,
         target: e.target,
         amount: e.amount,
-      })),
-    };
-  }, [graphData, timelineStep, maxStep]);
+        step: e.step,
+      }));
+
+    return { nodes, links };
+  }, [graphData, timelineStep, maxStep, invalidatedNodes]);
 
   // Strengthen repulsion and add an explicit collision force so sibling
   // nodes remain readable at each left-to-right rank.
@@ -165,51 +220,71 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
   const nodeCanvasObject = useCallback((node, ctx, globalScale) => {
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
 
+    const firstSeen = nodeFirstSeenRef.current[node.id] || Date.now();
+    const age = Date.now() - firstSeen;
+    const opacity = Math.min(1, age / 600); // fade in over 600ms
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+
+    const isInvalidated = invalidatedNodes.has(node.id);
     const size = NODE_SIZES[node.type] || 6;
-    const color = NODE_COLORS[node.type] || '#94a3b8';
+    let color = NODE_COLORS[node.type] || '#94a3b8';
+    
+    if (isInvalidated) {
+      color = '#4a2020';
+    }
+
     const isFrozen = frozenNodes.has(node.id);
     const drawColor = isFrozen ? '#e4483f' : color;
     const time = Date.now() / 1000;
     
     // Outer pulsing ring for interactive nodes
-    const pulseFactor = (Math.sin(time * 3) + 1) / 2; // 0 to 1
+    const pulseSpeed = isInvalidated ? 6 : 3;
+    const pulseFactor = (Math.sin(time * pulseSpeed) + 1) / 2; // 0 to 1
     const pulseRadius = size + 2 + (pulseFactor * 4);
     
     ctx.beginPath();
     ctx.arc(node.x, node.y, pulseRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = `${drawColor}${Math.floor(40 * (1 - pulseFactor)).toString(16).padStart(2, '0')}`;
+    if (isInvalidated) {
+      ctx.fillStyle = `#e4483f${Math.floor(40 * (1 - pulseFactor)).toString(16).padStart(2, '0')}`;
+    } else {
+      ctx.fillStyle = `${drawColor}${Math.floor(40 * (1 - pulseFactor)).toString(16).padStart(2, '0')}`;
+    }
     ctx.fill();
 
     let drawColorFilled = false;
     try {
-      // Outer glow halo — gives each node a "signal" feel rather than a flat dot
-      const glowRadius = Number(size * 2.6);
-      if (glowRadius > 0 && Number.isFinite(glowRadius)) {
-        const glow = ctx.createRadialGradient(Number(node.x), Number(node.y), 0, Number(node.x), Number(node.y), glowRadius);
-        glow.addColorStop(0, `${drawColor}55`);
-        glow.addColorStop(1, `${drawColor}00`);
-        ctx.beginPath();
-        ctx.fillStyle = glow;
-        ctx.arc(node.x, node.y, glowRadius, 0, 2 * Math.PI);
-        ctx.fill();
-      }
+      if (!isInvalidated) {
+        // Outer glow halo — gives each node a "signal" feel rather than a flat dot
+        const glowRadius = Number(size * 2.6);
+        if (glowRadius > 0 && Number.isFinite(glowRadius)) {
+          const glow = ctx.createRadialGradient(Number(node.x), Number(node.y), 0, Number(node.x), Number(node.y), glowRadius);
+          glow.addColorStop(0, `${drawColor}55`);
+          glow.addColorStop(1, `${drawColor}00`);
+          ctx.beginPath();
+          ctx.fillStyle = glow;
+          ctx.arc(node.x, node.y, glowRadius, 0, 2 * Math.PI);
+          ctx.fill();
+        }
 
-      // Core circle with a subtle radial shade for depth (flat -> spherical)
-      const r0 = Number(size * 0.15);
-      const r1 = Number(size);
-      if (r0 >= 0 && r1 >= 0 && Number.isFinite(r0) && Number.isFinite(r1)) {
-        const core = ctx.createRadialGradient(
-          Number(node.x - size * 0.35), Number(node.y - size * 0.35), r0,
-          Number(node.x), Number(node.y), r1
-        );
-        core.addColorStop(0, lighten(drawColor, 0.35));
-        core.addColorStop(1, drawColor);
+        // Core circle with a subtle radial shade for depth (flat -> spherical)
+        const r0 = Number(size * 0.15);
+        const r1 = Number(size);
+        if (r0 >= 0 && r1 >= 0 && Number.isFinite(r0) && Number.isFinite(r1)) {
+          const core = ctx.createRadialGradient(
+            Number(node.x - size * 0.35), Number(node.y - size * 0.35), r0,
+            Number(node.x), Number(node.y), r1
+          );
+          core.addColorStop(0, lighten(drawColor, 0.35));
+          core.addColorStop(1, drawColor);
 
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-        ctx.fillStyle = core;
-        ctx.fill();
-        drawColorFilled = true;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+          ctx.fillStyle = core;
+          ctx.fill();
+          drawColorFilled = true;
+        }
       }
     } catch (e) {
       console.warn("Gradient error:", e, node);
@@ -223,14 +298,16 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
     }
 
     // Crisp border
-    ctx.strokeStyle = isFrozen ? '#ffffff' : `${drawColor}99`;
+    ctx.strokeStyle = isFrozen ? '#ffffff' : (isInvalidated ? '#e4483f' : `${drawColor}99`);
     ctx.lineWidth = isFrozen ? 2 : 1.4;
     ctx.stroke();
 
-    if (isFrozen) {
+    if (isFrozen || isInvalidated) {
       ctx.beginPath();
       ctx.moveTo(node.x - size, node.y - size);
       ctx.lineTo(node.x + size, node.y + size);
+      ctx.moveTo(node.x - size, node.y + size);
+      ctx.lineTo(node.x + size, node.y - size);
       ctx.strokeStyle = '#e4483f';
       ctx.lineWidth = 2 / globalScale;
       ctx.stroke();
@@ -266,9 +343,21 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#f4f7f5';
-      ctx.fillText(label, node.x, chipY + chipH / 2 + 0.5);
+      const textY = chipY + chipH / 2 + 0.5;
+      ctx.fillText(label, node.x, textY);
+      
+      if (isInvalidated) {
+         ctx.beginPath();
+         ctx.moveTo(chipX + padX - 2, textY);
+         ctx.lineTo(chipX + chipW - padX + 2, textY);
+         ctx.strokeStyle = '#e4483f';
+         ctx.lineWidth = 1.5 / globalScale;
+         ctx.stroke();
+      }
     }
-  }, [frozenNodes]);
+    
+    ctx.restore();
+  }, [frozenNodes, invalidatedNodes]);
 
   const linkCanvasObject = useCallback((link, ctx) => {
     const start = link.source;
@@ -277,45 +366,85 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
         !Number.isFinite(end.x) || !Number.isFinite(end.y)) return;
 
     const isFrozen = frozenNodes.has(start.id) || frozenNodes.has(end.id);
+    const isInvalidated = invalidatedNodes.has(start.id) || invalidatedNodes.has(end.id);
+    
     const sourceColor = NODE_COLORS[start.type] || '#8a9390';
 
-    const grad = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
-    if (isFrozen) {
-      grad.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
-      grad.addColorStop(1, 'rgba(239, 68, 68, 0.15)');
+    ctx.save();
+
+    if (isInvalidated) {
+      ctx.setLineDash([5, 4]);
+      ctx.lineDashOffset = -(Date.now() / 100) % 20;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.strokeStyle = 'rgba(228, 72, 63, 0.7)'; // red
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+      ctx.setLineDash([]);
     } else {
-      grad.addColorStop(0, `${sourceColor}66`);
-      grad.addColorStop(1, 'rgba(255, 255, 255, 0.08)');
+      // Check if it's a NEW path edge (corrected branch)
+      // We can assume an edge is a new branch if its step is greater than prevTimelineStep
+      const isNewBranch = link.step > prevTimelineStepRef.current && prevTimelineStepRef.current > 1;
+
+      const grad = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+      if (isFrozen) {
+        grad.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+        grad.addColorStop(1, 'rgba(239, 68, 68, 0.15)');
+      } else {
+        grad.addColorStop(0, `${sourceColor}66`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.08)');
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      if (isNewBranch) {
+        ctx.strokeStyle = 'rgba(65, 220, 143, 0.9)'; // bright accent green
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = isFrozen ? 1.6 : 1.3;
+      }
+      ctx.stroke();
+
+      // Arrow
+      const angle = Math.atan2(end.y - start.y, end.x - start.x);
+      const midX = (start.x + end.x) / 2;
+      const midY = (start.y + end.y) / 2;
+      
+      let arrowLen = 5;
+      let arrowStroke = isFrozen ? 'rgba(239, 68, 68, 0.7)' : `${sourceColor}88`;
+      let arrowX = midX;
+      let arrowY = midY;
+      
+      if (isNewBranch) {
+         // Animated moving arrow
+         const progress = (Date.now() / 1500) % 1;
+         arrowX = start.x + (end.x - start.x) * progress;
+         arrowY = start.y + (end.y - start.y) * progress;
+         arrowLen = 8;
+         arrowStroke = 'rgba(65, 220, 143, 0.9)';
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(
+        arrowX - arrowLen * Math.cos(angle - Math.PI / 6),
+        arrowY - arrowLen * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(
+        arrowX - arrowLen * Math.cos(angle + Math.PI / 6),
+        arrowY - arrowLen * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.strokeStyle = arrowStroke;
+      ctx.lineWidth = isNewBranch ? 2 : 1.4;
+      ctx.stroke();
     }
-
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = isFrozen ? 1.6 : 1.3;
-    ctx.stroke();
-
-    // Arrow
-    const angle = Math.atan2(end.y - start.y, end.x - start.x);
-    const arrowLen = 5;
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-    const arrowStroke = isFrozen ? 'rgba(239, 68, 68, 0.7)' : `${sourceColor}88`;
-    ctx.beginPath();
-    ctx.moveTo(midX, midY);
-    ctx.lineTo(
-      midX - arrowLen * Math.cos(angle - Math.PI / 6),
-      midY - arrowLen * Math.sin(angle - Math.PI / 6)
-    );
-    ctx.moveTo(midX, midY);
-    ctx.lineTo(
-      midX - arrowLen * Math.cos(angle + Math.PI / 6),
-      midY - arrowLen * Math.sin(angle + Math.PI / 6)
-    );
-    ctx.strokeStyle = arrowStroke;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-  }, [frozenNodes]);
+    
+    ctx.restore();
+  }, [frozenNodes, invalidatedNodes]);
 
   const getTooltipContent = () => {
     if (!hoverNode) return null;

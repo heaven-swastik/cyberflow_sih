@@ -193,15 +193,24 @@ const PredictionStep = ({ caseData }) => {
 
   return (
     <div className="prediction-step">
-      <div className="prediction-header-large">
-        <div className="prediction-header-left">
-           <div className="prediction-action-title">Most Likely Next Action</div>
-           <div className="prediction-action-value">{predicted ? predicted.replace(/_/g, ' ') : 'UNKNOWN'}</div>
-           <div className="prediction-action-sub">Predicted with {probabilities[predicted] ? formatPercent(probabilities[predicted]) : '0%'} confidence</div>
-        </div>
-        <div className="prediction-header-right">
-           <ArcGauge percent={(caseData.network_risk || 0) * 100} label="Network Risk" />
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { icon: '⚡', label: 'RISK SCORE', value: `${Math.round((caseData.network_risk || 0) * 100)}%`, color: (caseData.network_risk || 0) > 0.7 ? '#e4483f' : (caseData.network_risk || 0) > 0.4 ? '#e2954a' : '#41dc8f' },
+          { icon: '🎯', label: 'PREDICTED ACTION', value: predicted ? predicted.replace(/_/g, ' ').toUpperCase() : '—', color: '#41dc8f' },
+          { icon: '📊', label: 'CONFIDENCE', value: probabilities[predicted] ? `${Math.round(probabilities[predicted] * 100)}%` : '—', color: '#5b8fd6' },
+          { icon: '🤖', label: 'MODEL', value: caseData.model_mode?.includes('ML') ? 'ML' : 'RULES', color: '#e2954a' },
+        ].map(tile => (
+          <div key={tile.label} style={{
+            background: '#13231f', border: '1px solid rgba(65,220,143,0.12)', borderRadius: 10, padding: '1rem',
+            display: 'flex', flexDirection: 'column', gap: 4
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: '1rem' }}>{tile.icon}</span>
+              <span style={{ fontSize: '0.7rem', color: '#8a9390', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tile.label}</span>
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: tile.color, fontFamily: 'IBM Plex Mono, monospace' }}>{tile.value}</div>
+          </div>
+        ))}
       </div>
 
       <div className="prediction-layout">
@@ -223,6 +232,10 @@ const PredictionStep = ({ caseData }) => {
                 >
                    <div className="prediction-atm-detail-header">
                      <div>
+                       <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                         <span style={{ background: '#5b8fd633', color: '#5b8fd6', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>{selectedAtm.bank_name}</span>
+                         <span style={{ background: '#8a939033', color: '#8a9390', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>{selectedAtm.zone_id}</span>
+                       </div>
                        <div className="prediction-atm-name">{selectedAtm.bank_name}</div>
                        <div className="prediction-atm-address">{selectedAtm.address}</div>
                      </div>
@@ -240,7 +253,7 @@ const PredictionStep = ({ caseData }) => {
                       <div className="prediction-atm-factor-row">
                          <div className="prediction-atm-factor-label">
                             <span>Zone Model Confidence</span>
-                            <span>45% weight</span>
+                            <span>{Math.round(selectedAtm.confidence * 45)}% (45% weight)</span>
                          </div>
                          <div className="prediction-atm-factor-bar">
                             <div style={{width: `${Math.min(100, selectedAtm.confidence * 120)}%`, background: '#5b8fd6'}}></div>
@@ -249,7 +262,7 @@ const PredictionStep = ({ caseData }) => {
                       <div className="prediction-atm-factor-row">
                          <div className="prediction-atm-factor-label">
                             <span>Historical Withdrawal Score</span>
-                            <span>30% weight</span>
+                            <span>{Math.round(selectedAtm.confidence * 30)}% (30% weight)</span>
                          </div>
                          <div className="prediction-atm-factor-bar">
                             <div style={{width: `${Math.min(100, selectedAtm.confidence * 90)}%`, background: '#e2954a'}}></div>
@@ -258,7 +271,7 @@ const PredictionStep = ({ caseData }) => {
                       <div className="prediction-atm-factor-row">
                          <div className="prediction-atm-factor-label">
                             <span>Device Proximity Score</span>
-                            <span>25% weight</span>
+                            <span>{Math.round(selectedAtm.confidence * 25)}% (25% weight)</span>
                          </div>
                          <div className="prediction-atm-factor-bar">
                             <div style={{width: `${Math.min(100, selectedAtm.confidence * 80)}%`, background: '#41dc8f'}}></div>
