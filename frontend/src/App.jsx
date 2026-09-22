@@ -21,6 +21,7 @@ import SimulationRunner from './components/SimulationRunner';
 import GuardrailFooter from './components/GuardrailFooter';
 import ComplaintPortal from './components/ComplaintPortal';
 import ApiIntegrationPanel from './components/ApiIntegrationPanel';
+import NCRPDemo from './components/NCRPDemo';
 import { stateLabel, stateColor } from './utils/format';
 
 // The actual app shell — separated so useAuth() works inside AuthProvider
@@ -449,6 +450,18 @@ function AppContent() {
 
 // Top-level App wraps AppContent in AuthProvider
 export default function App() {
+  const [pathname, setPathname] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const onPopState = () => setPathname(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  if (pathname === '/ncrp-demo') {
+    return <NCRPDemo />;
+  }
+
   return (
     <AuthProvider>
       <AppContent />
