@@ -49,7 +49,7 @@ export default function TimelineScrubber({ caseId, onStepChange, onStateChange, 
           }
           return prev + 1;
         });
-      }, 1800);
+      }, 1100);
     }
     return () => clearInterval(intervalRef.current);
   }, [isPlaying, maxStep, isAtEnd]);

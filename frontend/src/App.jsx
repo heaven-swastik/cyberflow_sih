@@ -20,13 +20,14 @@ import ActionStep from './components/ActionStep';
 import SimulationRunner from './components/SimulationRunner';
 import GuardrailFooter from './components/GuardrailFooter';
 import ComplaintPortal from './components/ComplaintPortal';
+import ComplainantDashboard from './components/ComplainantDashboard';
 import ApiIntegrationPanel from './components/ApiIntegrationPanel';
 import NCRPDemo from './components/NCRPDemo';
 import { stateLabel, stateColor } from './utils/format';
 
 // The actual app shell — separated so useAuth() works inside AuthProvider
 function AppContent() {
-  const { user, role, isAuthenticated, loading: authLoading, logout, isAdmin, isComplainant } = useAuth();
+  const { user, role, isAuthenticated, loading: authLoading, logout, isAdmin, isComplainant, isOfficer } = useAuth();
 
   const [view, setView] = useState('landing');
   const [selectedCaseId, setSelectedCaseId] = useState(null);
@@ -162,6 +163,10 @@ function AppContent() {
   // "Run Incident Simulation" — jump straight into the workspace for the
   // latest case and auto-play the full story
   const handleRunSimulation = useCallback(async () => {
+    if (!isAuthenticated) {
+      setView('login');
+      return;
+    }
     try {
       const cases = await getCases();
       // Pick the most recently added case (which would be the user's new complaint if they just filed one)
@@ -241,9 +246,13 @@ function AppContent() {
     );
   }
 
-  // Not authenticated — show login
-  if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={() => {}} />;
+  // If unauthenticated and trying to view a protected workspace, force login
+  if (!isAuthenticated && view === 'workspace') {
+    return <LoginPage onLoginSuccess={() => setView('landing')} onBack={() => setView('landing')} />;
+  }
+  
+  if (view === 'login') {
+    return <LoginPage onLoginSuccess={() => setView('landing')} onBack={() => setView('landing')} />;
   }
 
   return (
@@ -273,24 +282,32 @@ function AppContent() {
           </span>
           {/* User info + actions */}
           <div className="header-user-section">
-            {isComplainant && (
-              <button className="header-user-btn" onClick={() => setShowComplaintTracker(true)} title="My Complaints">
-                📋
+            {!isAuthenticated ? (
+              <button className="btn btn-primary" onClick={() => setView('login')} style={{ padding: '6px 12px', fontSize: '0.9rem' }}>
+                System Login
               </button>
+            ) : (
+              <>
+                {isComplainant && (
+                  <button className="header-user-btn" onClick={() => setShowComplaintTracker(true)} title="My Complaints">
+                    📋
+                  </button>
+                )}
+                {isAdmin && (
+                  <button className="header-user-btn" onClick={() => setShowAdminPanel(true)} title="Admin Panel">
+                    ⚙️
+                  </button>
+                )}
+                <div className="header-user-chip">
+                  <span className="header-user-avatar">{(user?.displayName || user?.email || '?')[0].toUpperCase()}</span>
+                  <span className="header-user-name">{user?.displayName || user?.email}</span>
+                  <span className={`header-user-role role-${role}`}>{role}</span>
+                </div>
+                <button className="header-logout-btn" onClick={logout} title="Sign out">
+                  ↗
+                </button>
+              </>
             )}
-            {isAdmin && (
-              <button className="header-user-btn" onClick={() => setShowAdminPanel(true)} title="Admin Panel">
-                ⚙️
-              </button>
-            )}
-            <div className="header-user-chip">
-              <span className="header-user-avatar">{(user?.displayName || user?.email || '?')[0].toUpperCase()}</span>
-              <span className="header-user-name">{user?.displayName || user?.email}</span>
-              <span className={`header-user-role role-${role}`}>{role}</span>
-            </div>
-            <button className="header-logout-btn" onClick={logout} title="Sign out">
-              ↗
-            </button>
           </div>
         </div>
       </header>
@@ -330,9 +347,23 @@ function AppContent() {
               <ApiIntegrationPanel onClose={() => setShowApiIntegration(false)} />
             )}
 
-            <OverviewBar />
-            <CaseList onSelectCase={openCase} />
-            <LiveFeed />
+            {isAuthenticated && (isAdmin || isOfficer) && (
+              <>
+                <OverviewBar />
+                <CaseList onSelectCase={openCase} />
+                <LiveFeed />
+              </>
+            )}
+            {isAuthenticated && isComplainant && (
+              <ComplainantDashboard onOpenCase={openCase} userCaseIds={userCaseIds} onFileComplaint={() => setShowComplaintPortal(true)} />
+            )}
+            {!isAuthenticated && (
+              <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
+                <h2 style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>Secure Intelligence Dashboard</h2>
+                <p>System access is restricted to authorized personnel only.</p>
+                <button className="btn btn-primary" onClick={() => setView('login')} style={{ marginTop: '1.5rem' }}>Authenticate to System</button>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -434,7 +465,7 @@ function AppContent() {
       )}
 
       {/* Complaint Tracker overlay (complainant role) */}
-      {showComplaintTracker && (
+      {isComplainant && showComplaintTracker && (
         <ComplaintTracker
           caseIds={userCaseIds}
           onOpenCase={(caseId) => {

@@ -361,6 +361,12 @@ app.get('/api/blockchain/verify', authenticateToken, requireRole('admin'), (req,
   res.json(result);
 });
 
+app.post('/api/blockchain/heal', authenticateToken, requireRole('admin'), (req, res) => {
+  const result = runBlockchainCli('heal-chain');
+  if (!result) return res.status(500).json({ error: "Failed to heal blockchain" });
+  res.json(result);
+});
+
 app.get('/api/blockchain/stats', authenticateToken, requireRole('admin'), (req, res) => {
   const result = runBlockchainCli('get_stats');
   if (!result) return res.status(500).json({ error: "Failed to read blockchain stats" });
@@ -472,7 +478,8 @@ app.post('/api/complaints',
 
   let parsed;
   try {
-    parsed = JSON.parse(result.stdout);
+    const jsonStr = result.stdout.substring(result.stdout.indexOf('{'));
+    parsed = JSON.parse(jsonStr);
   } catch (e) {
     return res.status(500).json({ error: "Could not parse complaint intake output", detail: result.stdout.slice(0, 2000) });
   }
@@ -580,12 +587,14 @@ app.post('/api/integration/predict', (req, res) => {
     if (result.status !== 0) {
       return res.status(500).json({ error: "prediction pipeline failed", detail: result.stderr });
     }
-    let parsed;
-    try {
-      parsed = JSON.parse(result.stdout);
-    } catch (e) {
-      return res.status(500).json({ error: "could not parse pipeline output" });
-    }
+      let parsed;
+      try {
+        // Find the first '{' to ignore any python print warnings before the JSON
+        const jsonStr = result.stdout.substring(result.stdout.indexOf('{'));
+        parsed = JSON.parse(jsonStr);
+      } catch (e) {
+        return res.status(500).json({ error: "could not parse pipeline output", detail: result.stdout });
+      }
     if (parsed.status === 'VALIDATION_FAILED') return res.status(400).json(parsed);
 
     data.cases = data.cases || [];

@@ -5,7 +5,7 @@
       "model_mode": "ML (XGBoost)",
       "fraud_type": "investment_scam",
       "current_state": "consolidation",
-      "network_risk": 0.99,
+      "network_risk": 0.98,
       "next_action": {
         "predicted": "cashout",
         "probabilities": {
@@ -48,32 +48,38 @@
         {
           "feature": "distinct_device_count",
           "value": 15.0,
-          "model_importance": 0.4653
-        },
-        {
-          "feature": "hop_depth",
-          "value": 4.0,
-          "model_importance": 0.2218
-        },
-        {
-          "feature": "num_nodes",
-          "value": 16.0,
-          "model_importance": 0.196
+          "shap_contribution": 0.0756,
+          "direction": "increases_risk"
         },
         {
           "feature": "rapid_tx_count",
           "value": 12.0,
-          "model_importance": 0.0247
+          "shap_contribution": 0.052,
+          "direction": "increases_risk"
+        },
+        {
+          "feature": "hop_depth",
+          "value": 4.0,
+          "shap_contribution": 0.037,
+          "direction": "increases_risk"
         },
         {
           "feature": "mean_fan_in",
           "value": 1.188,
-          "model_importance": 0.0166
+          "shap_contribution": 0.023,
+          "direction": "increases_risk"
         },
         {
-          "feature": "max_betweenness",
-          "value": 0.21,
-          "model_importance": 0.0143
+          "feature": "convergence_ratio",
+          "value": 0.188,
+          "shap_contribution": 0.0226,
+          "direction": "increases_risk"
+        },
+        {
+          "feature": "burst_ratio",
+          "value": 0.667,
+          "shap_contribution": 0.0138,
+          "direction": "increases_risk"
         }
       ],
       "evidence_status": "sufficient",
@@ -87,7 +93,7 @@
         "channel": "NCRP-style online complaint (synthetic demo record)"
       },
       "device_location": {
-        "device_id": "DEV-33613",
+        "device_id": "DEV-15320",
         "device_fingerprint": "fp_202d4b65",
         "latitude": 22.59194,
         "longitude": 88.36892,
@@ -270,7 +276,91 @@
           "sufficient_for_prediction": true,
           "sufficient_for_reliable_prediction": true
         }
-      }
+      },
+      "predicted_paths": {
+        "case_id": "CF-1042",
+        "current_state": "consolidation",
+        "primary_path": {
+          "stages": [
+            {
+              "state": "consolidation",
+              "confidence": 1.0,
+              "risk": 0.98,
+              "action": "cashout",
+              "action_confidence": 0.96,
+              "is_current": true
+            },
+            {
+              "state": "consolidation",
+              "confidence": 0.6,
+              "risk": 0.98,
+              "action": "cashout",
+              "action_confidence": 0.96,
+              "is_current": false
+            },
+            {
+              "state": "cashout_prep",
+              "confidence": 0.6,
+              "risk": 0.98,
+              "action": "cashout",
+              "action_confidence": 0.93,
+              "is_current": false
+            }
+          ],
+          "cumulative_confidence": 0.36
+        },
+        "alternative_paths": [],
+        "backtrack_log": [
+          {
+            "from_state": "consolidation",
+            "rejected_state": "emerging",
+            "confidence": 0.08,
+            "reason": "Confidence 0.08 below threshold 0.2",
+            "depth": 1
+          },
+          {
+            "from_state": "consolidation",
+            "rejected_state": "collection",
+            "confidence": 0.08,
+            "reason": "Confidence 0.08 below threshold 0.2",
+            "depth": 1
+          }
+        ],
+        "total_paths_explored": 3,
+        "path_summary": "Primary predicted path (36.0% cumulative confidence): consolidation \u2192 consolidation \u2192 cashout_prep. 2 path(s) were explored and rejected during analysis."
+      },
+      "rl_recommendations": [
+        {
+          "action": "investigate_terminal",
+          "q_value": 1.7,
+          "explanation": "STRONGLY RECOMMENDED: Focus on terminal accounts (only receive, never forward) \u2014 these are likely the cashout endpoints",
+          "recommended": true
+        },
+        {
+          "action": "investigate_high_fan_in",
+          "q_value": 1.6,
+          "explanation": "STRONGLY RECOMMENDED: Investigate accounts receiving funds from multiple sources \u2014 identifies consolidation hubs where stolen funds converge",
+          "recommended": true
+        },
+        {
+          "action": "follow_money_trail",
+          "q_value": 1.5,
+          "explanation": "STRONGLY RECOMMENDED: Follow the highest-value transaction chain from victim to endpoint \u2014 traces the primary flow of stolen funds",
+          "recommended": true
+        },
+        {
+          "action": "investigate_high_fan_out",
+          "q_value": 1.3,
+          "explanation": "STRONGLY RECOMMENDED: Investigate accounts distributing funds to many destinations \u2014 reveals the distribution layer of the mule network",
+          "recommended": false
+        },
+        {
+          "action": "investigate_hub",
+          "q_value": 1.3,
+          "explanation": "STRONGLY RECOMMENDED: Target collection/consolidation hub accounts \u2014 disrupting hubs fragments the entire network",
+          "recommended": false
+        }
+      ]
     },
     {
       "case_id": "CF-2001",
@@ -314,34 +404,40 @@
       ],
       "risk_feature_contributions": [
         {
-          "feature": "distinct_device_count",
+          "feature": "rapid_tx_count",
           "value": 3.0,
-          "model_importance": 0.4653
+          "shap_contribution": 0.035,
+          "direction": "increases_risk"
+        },
+        {
+          "feature": "recurring_amount_ratio",
+          "value": 0.8,
+          "shap_contribution": -0.0333,
+          "direction": "decreases_risk"
         },
         {
           "feature": "hop_depth",
           "value": 2.0,
-          "model_importance": 0.2218
-        },
-        {
-          "feature": "num_nodes",
-          "value": 6.0,
-          "model_importance": 0.196
-        },
-        {
-          "feature": "rapid_tx_count",
-          "value": 3.0,
-          "model_importance": 0.0247
+          "shap_contribution": -0.0293,
+          "direction": "decreases_risk"
         },
         {
           "feature": "mean_fan_in",
           "value": 0.833,
-          "model_importance": 0.0166
+          "shap_contribution": -0.0121,
+          "direction": "decreases_risk"
         },
         {
-          "feature": "max_betweenness",
-          "value": 0.2,
-          "model_importance": 0.0143
+          "feature": "burst_ratio",
+          "value": 0.75,
+          "shap_contribution": 0.0118,
+          "direction": "increases_risk"
+        },
+        {
+          "feature": "device_consistency_ratio",
+          "value": 0.5,
+          "shap_contribution": -0.0111,
+          "direction": "decreases_risk"
         }
       ],
       "evidence_status": "sufficient",
@@ -355,7 +451,7 @@
         "channel": "NCRP-style online complaint (synthetic demo record)"
       },
       "device_location": {
-        "device_id": "DEV-86642",
+        "device_id": "DEV-42891",
         "device_fingerprint": "fp_565997af",
         "latitude": 28.62805,
         "longitude": 77.18688,
@@ -528,7 +624,107 @@
           "sufficient_for_prediction": true,
           "sufficient_for_reliable_prediction": true
         }
-      }
+      },
+      "predicted_paths": {
+        "case_id": "CF-2001",
+        "current_state": "distribution",
+        "primary_path": {
+          "stages": [
+            {
+              "state": "distribution",
+              "confidence": 1.0,
+              "risk": 0.68,
+              "action": "further_layering",
+              "action_confidence": 1.0,
+              "is_current": true
+            },
+            {
+              "state": "distribution",
+              "confidence": 0.6,
+              "risk": 0.71,
+              "action": "further_layering",
+              "action_confidence": 1.0,
+              "is_current": false
+            },
+            {
+              "state": "layering",
+              "confidence": 0.6,
+              "risk": 0.76,
+              "action": "further_layering",
+              "action_confidence": 0.99,
+              "is_current": false
+            },
+            {
+              "state": "consolidation",
+              "confidence": 0.6,
+              "risk": 0.79,
+              "action": "further_layering",
+              "action_confidence": 0.7,
+              "is_current": false
+            },
+            {
+              "state": "cashout_prep",
+              "confidence": 0.6,
+              "risk": 0.8,
+              "action": "further_layering",
+              "action_confidence": 0.7,
+              "is_current": false
+            }
+          ],
+          "cumulative_confidence": 0.1296
+        },
+        "alternative_paths": [],
+        "backtrack_log": [
+          {
+            "from_state": "distribution",
+            "rejected_state": "emerging",
+            "confidence": 0.08,
+            "reason": "Confidence 0.08 below threshold 0.2",
+            "depth": 1
+          },
+          {
+            "from_state": "distribution",
+            "rejected_state": "collection",
+            "confidence": 0.08,
+            "reason": "Confidence 0.08 below threshold 0.2",
+            "depth": 1
+          }
+        ],
+        "total_paths_explored": 3,
+        "path_summary": "Primary predicted path (13.0% cumulative confidence): distribution \u2192 distribution \u2192 layering \u2192 consolidation \u2192 cashout_prep. 2 path(s) were explored and rejected during analysis."
+      },
+      "rl_recommendations": [
+        {
+          "action": "investigate_high_fan_out",
+          "q_value": 0.6,
+          "explanation": "STRONGLY RECOMMENDED: Investigate accounts distributing funds to many destinations \u2014 reveals the distribution layer of the mule network",
+          "recommended": true
+        },
+        {
+          "action": "investigate_hub",
+          "q_value": 0.6,
+          "explanation": "STRONGLY RECOMMENDED: Target collection/consolidation hub accounts \u2014 disrupting hubs fragments the entire network",
+          "recommended": true
+        },
+        {
+          "action": "follow_money_trail",
+          "q_value": 0.5,
+          "explanation": "Recommended: Follow the highest-value transaction chain from victim to endpoint \u2014 traces the primary flow of stolen funds",
+          "recommended": true
+        },
+        {
+          "action": "investigate_high_fan_in",
+          "q_value": 0.3,
+          "explanation": "Recommended: Investigate accounts receiving funds from multiple sources \u2014 identifies consolidation hubs where stolen funds converge",
+          "recommended": false
+        },
+        {
+          "action": "investigate_terminal",
+          "q_value": 0.3,
+          "explanation": "Recommended: Focus on terminal accounts (only receive, never forward) \u2014 these are likely the cashout endpoints",
+          "recommended": false
+        }
+      ]
     },
     {
       "case_id": "CF-3001",
@@ -576,32 +772,38 @@
         {
           "feature": "distinct_device_count",
           "value": 6.0,
-          "model_importance": 0.4653
-        },
-        {
-          "feature": "hop_depth",
-          "value": 2.0,
-          "model_importance": 0.2218
-        },
-        {
-          "feature": "num_nodes",
-          "value": 11.0,
-          "model_importance": 0.196
+          "shap_contribution": 0.0746,
+          "direction": "increases_risk"
         },
         {
           "feature": "rapid_tx_count",
           "value": 0.0,
-          "model_importance": 0.0247
+          "shap_contribution": -0.031,
+          "direction": "decreases_risk"
         },
         {
-          "feature": "mean_fan_in",
-          "value": 0.909,
-          "model_importance": 0.0166
+          "feature": "hop_depth",
+          "value": 2.0,
+          "shap_contribution": -0.0309,
+          "direction": "decreases_risk"
         },
         {
-          "feature": "max_betweenness",
-          "value": 0.278,
-          "model_importance": 0.0143
+          "feature": "recurring_amount_ratio",
+          "value": 0.6,
+          "shap_contribution": -0.0275,
+          "direction": "decreases_risk"
+        },
+        {
+          "feature": "max_fan_in",
+          "value": 5.0,
+          "shap_contribution": 0.0095,
+          "direction": "increases_risk"
+        },
+        {
+          "feature": "device_consistency_ratio",
+          "value": 0.444,
+          "shap_contribution": -0.0088,
+          "direction": "decreases_risk"
         }
       ],
       "evidence_status": "sufficient",
@@ -615,7 +817,7 @@
         "channel": "NCRP-style online complaint (synthetic demo record)"
       },
       "device_location": {
-        "device_id": "DEV-93832",
+        "device_id": "DEV-28495",
         "device_fingerprint": "fp_46d8e467",
         "latitude": 19.07358,
         "longitude": 72.87787,
@@ -793,7 +995,107 @@
           "sufficient_for_prediction": true,
           "sufficient_for_reliable_prediction": true
         }
-      }
+      },
+      "predicted_paths": {
+        "case_id": "CF-3001",
+        "current_state": "distribution",
+        "primary_path": {
+          "stages": [
+            {
+              "state": "distribution",
+              "confidence": 1.0,
+              "risk": 0.71,
+              "action": "further_layering",
+              "action_confidence": 0.98,
+              "is_current": true
+            },
+            {
+              "state": "distribution",
+              "confidence": 0.6,
+              "risk": 0.74,
+              "action": "further_layering",
+              "action_confidence": 0.98,
+              "is_current": false
+            },
+            {
+              "state": "layering",
+              "confidence": 0.6,
+              "risk": 0.79,
+              "action": "further_layering",
+              "action_confidence": 0.65,
+              "is_current": false
+            },
+            {
+              "state": "consolidation",
+              "confidence": 0.6,
+              "risk": 0.79,
+              "action": "further_layering",
+              "action_confidence": 0.65,
+              "is_current": false
+            },
+            {
+              "state": "cashout_prep",
+              "confidence": 0.6,
+              "risk": 0.79,
+              "action": "further_layering",
+              "action_confidence": 0.66,
+              "is_current": false
+            }
+          ],
+          "cumulative_confidence": 0.1296
+        },
+        "alternative_paths": [],
+        "backtrack_log": [
+          {
+            "from_state": "distribution",
+            "rejected_state": "emerging",
+            "confidence": 0.08,
+            "reason": "Confidence 0.08 below threshold 0.2",
+            "depth": 1
+          },
+          {
+            "from_state": "distribution",
+            "rejected_state": "collection",
+            "confidence": 0.08,
+            "reason": "Confidence 0.08 below threshold 0.2",
+            "depth": 1
+          }
+        ],
+        "total_paths_explored": 3,
+        "path_summary": "Primary predicted path (13.0% cumulative confidence): distribution \u2192 distribution \u2192 layering \u2192 consolidation \u2192 cashout_prep. 2 path(s) were explored and rejected during analysis."
+      },
+      "rl_recommendations": [
+        {
+          "action": "investigate_high_fan_out",
+          "q_value": 0.6,
+          "explanation": "STRONGLY RECOMMENDED: Investigate accounts distributing funds to many destinations \u2014 reveals the distribution layer of the mule network",
+          "recommended": true
+        },
+        {
+          "action": "investigate_hub",
+          "q_value": 0.6,
+          "explanation": "STRONGLY RECOMMENDED: Target collection/consolidation hub accounts \u2014 disrupting hubs fragments the entire network",
+          "recommended": true
+        },
+        {
+          "action": "follow_money_trail",
+          "q_value": 0.5,
+          "explanation": "Recommended: Follow the highest-value transaction chain from victim to endpoint \u2014 traces the primary flow of stolen funds",
+          "recommended": true
+        },
+        {
+          "action": "investigate_high_fan_in",
+          "q_value": 0.3,
+          "explanation": "Recommended: Investigate accounts receiving funds from multiple sources \u2014 identifies consolidation hubs where stolen funds converge",
+          "recommended": false
+        },
+        {
+          "action": "investigate_terminal",
+          "q_value": 0.3,
+          "explanation": "Recommended: Focus on terminal accounts (only receive, never forward) \u2014 these are likely the cashout endpoints",
+          "recommended": false
+        }
+      ]
     }
   ],
   "graphs": {
@@ -895,9 +1197,9 @@
           "label": "Complaint (CF-1042)"
         },
         {
-          "id": "DEV-33613",
+          "id": "DEV-15320",
           "type": "device",
-          "label": "Device (DEV-33613)"
+          "label": "Device (DEV-15320)"
         },
         {
           "id": "ATM-B05",
@@ -1054,14 +1356,14 @@
         },
         {
           "source": "ACC-1000",
-          "target": "DEV-33613",
+          "target": "DEV-15320",
           "amount": null,
           "timestamp": null,
           "step": 4,
           "relation": "linked_device"
         },
         {
-          "source": "DEV-33613",
+          "source": "DEV-15320",
           "target": "ATM-B05",
           "amount": null,
           "timestamp": null,
@@ -1069,7 +1371,7 @@
           "relation": "predicted_cashout"
         },
         {
-          "source": "DEV-33613",
+          "source": "DEV-15320",
           "target": "ATM-B02",
           "amount": null,
           "timestamp": null,
@@ -1121,9 +1423,9 @@
           "label": "Complaint (CF-2001)"
         },
         {
-          "id": "DEV-86642",
+          "id": "DEV-42891",
           "type": "device",
-          "label": "Device (DEV-86642)"
+          "label": "Device (DEV-42891)"
         },
         {
           "id": "ATM-A04",
@@ -1182,14 +1484,14 @@
         },
         {
           "source": "ACC-2050",
-          "target": "DEV-86642",
+          "target": "DEV-42891",
           "amount": null,
           "timestamp": null,
           "step": 2,
           "relation": "linked_device"
         },
         {
-          "source": "DEV-86642",
+          "source": "DEV-42891",
           "target": "ATM-A04",
           "amount": null,
           "timestamp": null,
@@ -1197,7 +1499,7 @@
           "relation": "predicted_cashout"
         },
         {
-          "source": "DEV-86642",
+          "source": "DEV-42891",
           "target": "ATM-A03",
           "amount": null,
           "timestamp": null,
@@ -1274,9 +1576,9 @@
           "label": "Complaint (CF-3001)"
         },
         {
-          "id": "DEV-93832",
+          "id": "DEV-28495",
           "type": "device",
-          "label": "Device (DEV-93832)"
+          "label": "Device (DEV-28495)"
         },
         {
           "id": "ATM-C02",
@@ -1370,14 +1672,14 @@
         },
         {
           "source": "ACC-4001",
-          "target": "DEV-93832",
+          "target": "DEV-28495",
           "amount": null,
           "timestamp": null,
           "step": 2,
           "relation": "linked_device"
         },
         {
-          "source": "DEV-93832",
+          "source": "DEV-28495",
           "target": "ATM-C02",
           "amount": null,
           "timestamp": null,
@@ -1385,7 +1687,7 @@
           "relation": "predicted_cashout"
         },
         {
-          "source": "DEV-93832",
+          "source": "DEV-28495",
           "target": "ATM-C04",
           "amount": null,
           "timestamp": null,
@@ -1445,7 +1747,7 @@
   },
   "alerts": [
     {
-      "alert_id": "ALT-4211",
+      "alert_id": "ALT-1144",
       "case_id": "CF-1042",
       "created_at": "2026-08-22T20:15:00Z",
       "current_state": "consolidation",
@@ -1457,10 +1759,10 @@
       "intervention_priority": "HIGH",
       "reason": "Model prediction: cashout at 96% confidence with consolidation state detected.",
       "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-      "hash": "sha256:5c39e62b5730aab776ef2bf245db198d88af02475860b3117867f8890650b963"
+      "hash": "sha256:38f415fd13350953748feca51ced2abb0539764225543166ae62184503e2302a"
     },
     {
-      "alert_id": "ALT-0493",
+      "alert_id": "ALT-5828",
       "case_id": "CF-2001",
       "created_at": "2026-08-22T20:15:00Z",
       "current_state": "distribution",
@@ -1471,11 +1773,11 @@
       "potential_exposure_inr": 1000000,
       "intervention_priority": "MEDIUM",
       "reason": "Model prediction: further_layering at 100% confidence with distribution state detected.",
-      "prev_hash": "sha256:5c39e62b5730aab776ef2bf245db198d88af02475860b3117867f8890650b963",
-      "hash": "sha256:6b0c6ff1b6f304ca6e24c46a50b8fa3644d33e2d5708e8f6f33c4a50b9d6c4fc"
+      "prev_hash": "sha256:38f415fd13350953748feca51ced2abb0539764225543166ae62184503e2302a",
+      "hash": "sha256:0070a5c555dc683e587e26400e6b05bce676ca642e679d1c6238cc2bb6dcc614"
     },
     {
-      "alert_id": "ALT-4022",
+      "alert_id": "ALT-8149",
       "case_id": "CF-3001",
       "created_at": "2026-08-22T20:15:00Z",
       "current_state": "distribution",
@@ -1486,8 +1788,8 @@
       "potential_exposure_inr": 2500000,
       "intervention_priority": "MEDIUM",
       "reason": "Model prediction: further_layering at 98% confidence with distribution state detected.",
-      "prev_hash": "sha256:6b0c6ff1b6f304ca6e24c46a50b8fa3644d33e2d5708e8f6f33c4a50b9d6c4fc",
-      "hash": "sha256:8431584cfa39e6a51a780e74d0bf3e31aa61040603668e0e3dc3a17855f13b85"
+      "prev_hash": "sha256:0070a5c555dc683e587e26400e6b05bce676ca642e679d1c6238cc2bb6dcc614",
+      "hash": "sha256:f7d592773a6e3403aa05311ed2e7bd94a8e5d87fbafefce6338387f13f17476c"
     }
   ],
   "simulations": {
@@ -1622,10 +1924,10 @@
     "library": "xgboost",
     "library_version": "3.4.1",
     "model_files": {
-      "state_classifier.json": "0a78268a624be2529340f215ee7c54be2ce251eac346ca05910eb213ed939695",
-      "action_predictor.json": "349b92254b22dc9e292139110f0638bbd73958927e7d23b3591338870fcf7df4",
-      "risk_scorer.json": "c7b57bcd181f51adfe08b377290372b1708742b32ae8e5d8409282bdddffde57",
-      "priority_classifier.json": "dd15b98639100511adf51fb8487347321764d12a99f78238b8235deb8aca4037"
+      "state_classifier.json": "d093be27b3cebc3b3f5b6c4506ea537e3847a0440bc32666781a389f8363e18d",
+      "action_predictor.json": "a1eb4c0ab8d11edcbadb212b9f389318d46004037fad8d1674785f4b33ed6844",
+      "risk_scorer.json": "e502308b7118b9860a7a62b68054e9230ad1470abf43dc6a13ed8a6b2ffec733",
+      "priority_classifier.json": "67cfdd6a8102e8e9055b39ad78251da29432e77f3a599072c825ce9b969afe7a"
     },
     "feature_count": 42,
     "feature_columns": [
@@ -1677,8 +1979,8 @@
       "state": 1.0,
       "action": 0.935,
       "priority": 0.93,
-      "risk_r2": 0.99654186812687,
-      "risk_mae": 0.009216881960630412
+      "risk_r2": 0.9965732169426834,
+      "risk_mae": 0.009127490037679667
     },
     "data_policy": "100% synthetic data"
   },
@@ -1688,7 +1990,7 @@
       "significance_test_continuous_target": "Pearson correlation test (scipy.stats.pearsonr) against network_risk",
       "significance_test_binary_target": "Welch's independent two-sample t-test (scipy.stats.ttest_ind, equal_var=False) comparing fraud vs. legitimate-business groups",
       "alpha": 0.05,
-      "dataset": "data/training_features.csv",
+      "dataset": "data\\training_features.csv",
       "n_cases": 1000,
       "n_features_tested": 42
     },
@@ -3627,253 +3929,253 @@
         {
           "feature": "hop_depth",
           "correlation_r": 0.837,
-          "p_value": 5.64303096850661e-264,
+          "p_value": 5.643030968510311e-264,
           "significant_at_0.05": true
         },
         {
           "feature": "mean_fan_in",
           "correlation_r": 0.792,
-          "p_value": 1.7382975117728747e-216,
+          "p_value": 1.738297511772943e-216,
           "significant_at_0.05": true
         },
         {
           "feature": "mean_fan_out",
           "correlation_r": 0.792,
-          "p_value": 1.7382975117728747e-216,
+          "p_value": 1.738297511772943e-216,
           "significant_at_0.05": true
         },
         {
           "feature": "distinct_device_count",
           "correlation_r": 0.779,
-          "p_value": 1.1738152516340362e-204,
+          "p_value": 1.173815251633992e-204,
           "significant_at_0.05": true
         },
         {
           "feature": "num_edges",
           "correlation_r": 0.719,
-          "p_value": 9.371576854077166e-160,
+          "p_value": 9.371576854077305e-160,
           "significant_at_0.05": true
         },
         {
           "feature": "num_nodes",
           "correlation_r": 0.718,
-          "p_value": 4.2365402400112375e-159,
+          "p_value": 4.2365402400111637e-159,
           "significant_at_0.05": true
         },
         {
           "feature": "rapid_tx_count",
           "correlation_r": 0.691,
-          "p_value": 9.37630240227773e-143,
+          "p_value": 9.376302402277834e-143,
           "significant_at_0.05": true
         },
         {
           "feature": "ft_legitimate_business",
           "correlation_r": -0.688,
-          "p_value": 2.3122722173421203e-141,
+          "p_value": 2.3122722173421803e-141,
           "significant_at_0.05": true
         },
         {
           "feature": "time_span_sec",
           "correlation_r": -0.682,
-          "p_value": 1.5501981380168614e-137,
+          "p_value": 1.5501981380168302e-137,
           "significant_at_0.05": true
         },
         {
           "feature": "total_volume",
           "correlation_r": 0.676,
-          "p_value": 2.5308910439007677e-134,
+          "p_value": 2.5308910439008934e-134,
           "significant_at_0.05": true
         },
         {
           "feature": "mean_inter_arrival_sec",
           "correlation_r": -0.671,
-          "p_value": 7.955367434721766e-132,
+          "p_value": 7.955367434721086e-132,
           "significant_at_0.05": true
         },
         {
           "feature": "max_betweenness",
           "correlation_r": 0.669,
-          "p_value": 5.252779239620583e-131,
+          "p_value": 5.252779239620377e-131,
           "significant_at_0.05": true
         },
         {
           "feature": "std_inter_arrival_sec",
           "correlation_r": -0.656,
-          "p_value": 6.251678603395127e-124,
+          "p_value": 6.251678603395186e-124,
           "significant_at_0.05": true
         },
         {
           "feature": "mean_betweenness",
           "correlation_r": 0.655,
-          "p_value": 2.093860474601634e-123,
+          "p_value": 2.0938604746015294e-123,
           "significant_at_0.05": true
         },
         {
           "feature": "device_consistency_ratio",
           "correlation_r": -0.634,
-          "p_value": 2.1856983937377343e-113,
+          "p_value": 2.185698393737701e-113,
           "significant_at_0.05": true
         },
         {
           "feature": "account_reuse_ratio",
           "correlation_r": -0.628,
-          "p_value": 7.408207370544792e-111,
+          "p_value": 7.408207370544794e-111,
           "significant_at_0.05": true
         },
         {
           "feature": "burst_ratio",
           "correlation_r": 0.593,
-          "p_value": 6.8354889023320476e-96,
+          "p_value": 6.835488902331727e-96,
           "significant_at_0.05": true
         },
         {
           "feature": "amount_cv",
           "correlation_r": -0.56,
-          "p_value": 1.5578727860296432e-83,
+          "p_value": 1.5578727860296116e-83,
           "significant_at_0.05": true
         },
         {
           "feature": "tx_count",
           "correlation_r": 0.511,
-          "p_value": 9.67103050957491e-68,
+          "p_value": 9.671030509573236e-68,
           "significant_at_0.05": true
         },
         {
           "feature": "max_to_mean_amount_ratio",
           "correlation_r": -0.505,
-          "p_value": 5.942697812684813e-66,
+          "p_value": 5.94269781268482e-66,
           "significant_at_0.05": true
         },
         {
           "feature": "hour_of_day_std",
           "correlation_r": -0.494,
-          "p_value": 9.174303187052454e-63,
+          "p_value": 9.17430318705223e-63,
           "significant_at_0.05": true
         },
         {
           "feature": "max_fan_in",
           "correlation_r": 0.487,
-          "p_value": 1.4963609005019955e-60,
+          "p_value": 1.4963609005017935e-60,
           "significant_at_0.05": true
         },
         {
           "feature": "convergence_ratio",
           "correlation_r": 0.464,
-          "p_value": 1.8670586225049728e-54,
+          "p_value": 1.867058622505028e-54,
           "significant_at_0.05": true
         },
         {
           "feature": "num_zones_active",
           "correlation_r": 0.383,
-          "p_value": 2.449342995824132e-36,
+          "p_value": 2.449342995824334e-36,
           "significant_at_0.05": true
         },
         {
           "feature": "max_zone_distance_km",
           "correlation_r": 0.374,
-          "p_value": 1.6491162526337617e-34,
+          "p_value": 1.6491162526336565e-34,
           "significant_at_0.05": true
         },
         {
           "feature": "min_inter_arrival_sec",
           "correlation_r": -0.335,
-          "p_value": 1.2563886580001036e-27,
+          "p_value": 1.256388658000027e-27,
           "significant_at_0.05": true
         },
         {
           "feature": "sources_only_count",
           "correlation_r": 0.33,
-          "p_value": 7.315134785676697e-27,
+          "p_value": 7.315134785675992e-27,
           "significant_at_0.05": true
         },
         {
           "feature": "recurring_amount_ratio",
           "correlation_r": -0.301,
-          "p_value": 2.0628750215812006e-22,
+          "p_value": 2.0628750215814139e-22,
           "significant_at_0.05": true
         },
         {
           "feature": "mean_amount",
           "correlation_r": 0.3,
-          "p_value": 3.363047747420571e-22,
+          "p_value": 3.363047747420533e-22,
           "significant_at_0.05": true
         },
         {
           "feature": "max_amount",
           "correlation_r": 0.248,
-          "p_value": 1.664008930267471e-15,
+          "p_value": 1.6640089302675672e-15,
           "significant_at_0.05": true
         },
         {
           "feature": "ft_investment_scam",
           "correlation_r": 0.226,
-          "p_value": 4.29751183300719e-13,
+          "p_value": 4.2975118330072875e-13,
           "significant_at_0.05": true
         },
         {
           "feature": "business_hours_ratio",
           "correlation_r": -0.223,
-          "p_value": 9.161768608849679e-13,
+          "p_value": 9.161768608849628e-13,
           "significant_at_0.05": true
         },
         {
           "feature": "velocity_tx_per_min",
           "correlation_r": -0.214,
-          "p_value": 8.421919467987923e-12,
+          "p_value": 8.421919467987645e-12,
           "significant_at_0.05": true
         },
         {
           "feature": "ft_digital_arrest",
           "correlation_r": 0.205,
-          "p_value": 5.379485971634653e-11,
+          "p_value": 5.3794859716346595e-11,
           "significant_at_0.05": true
         },
         {
           "feature": "std_amount",
           "correlation_r": 0.167,
-          "p_value": 1.1459063781123468e-07,
+          "p_value": 1.1459063781123256e-07,
           "significant_at_0.05": true
         },
         {
           "feature": "ft_fake_payment_gateway",
           "correlation_r": 0.114,
-          "p_value": 0.00032093921143811264,
+          "p_value": 0.0003209392114381152,
           "significant_at_0.05": true
         },
         {
           "feature": "zone_c_frac",
           "correlation_r": -0.113,
-          "p_value": 0.00033186047086566987,
+          "p_value": 0.00033186047086567106,
           "significant_at_0.05": true
         },
         {
           "feature": "max_fan_out",
           "correlation_r": 0.098,
-          "p_value": 0.001978507050262344,
+          "p_value": 0.001978507050262303,
           "significant_at_0.05": true
         },
         {
           "feature": "zone_b_frac",
           "correlation_r": 0.068,
-          "p_value": 0.030709918575726226,
+          "p_value": 0.030709918575726594,
           "significant_at_0.05": true
         },
         {
           "feature": "zone_a_frac",
           "correlation_r": 0.04,
-          "p_value": 0.20697053614420785,
+          "p_value": 0.206970536144209,
           "significant_at_0.05": false
         },
         {
           "feature": "sinks_only_count",
           "correlation_r": 0.012,
-          "p_value": 0.6984862726652046,
+          "p_value": 0.6984862726652041,
           "significant_at_0.05": false
         },
         {
           "feature": "min_amount",
           "correlation_r": 0.007,
-          "p_value": 0.8336765945239831,
+          "p_value": 0.8336765945239819,
           "significant_at_0.05": false
         }
       ],
@@ -4197,7 +4499,7 @@
           "mean_fraud": 2.8682,
           "mean_legitimate": 4.0267,
           "t_statistic": -11.392,
-          "p_value": 1.862470762497432e-27,
+          "p_value": 1.8624707624974315e-27,
           "significant_at_0.05": true,
           "n_fraud": 850,
           "n_legitimate": 150
@@ -4207,7 +4509,7 @@
           "mean_fraud": 0.2775,
           "mean_legitimate": 0.2183,
           "t_statistic": 8.512,
-          "p_value": 5.667166519755786e-16,
+          "p_value": 5.667166519755845e-16,
           "significant_at_0.05": true,
           "n_fraud": 850,
           "n_legitimate": 150
@@ -4247,7 +4549,7 @@
           "mean_fraud": 11.7165,
           "mean_legitimate": 11.2133,
           "t_statistic": 1.559,
-          "p_value": 0.1193959246523659,
+          "p_value": 0.11939592465236591,
           "significant_at_0.05": false,
           "n_fraud": 850,
           "n_legitimate": 150
@@ -4267,7 +4569,7 @@
           "mean_fraud": 0.3684,
           "mean_legitimate": 0.3267,
           "t_statistic": 1.02,
-          "p_value": 0.3091858788020895,
+          "p_value": 0.30918587880208953,
           "significant_at_0.05": false,
           "n_fraud": 850,
           "n_legitimate": 150

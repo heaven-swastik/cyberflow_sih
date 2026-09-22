@@ -55,3 +55,4 @@ Write-Host "`n[*] Stopping server..."
 Stop-Process -Id $process.Id -Force
 Remove-Item -Path $env:AUTH_USERS_FILE -ErrorAction SilentlyContinue
 Write-Host "Done."
+

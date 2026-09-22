@@ -314,7 +314,7 @@ class CyberFlowClassifierEngine:
                 "predicted": prediction["predicted_action"],
                 "probabilities": prediction["action_probs"]
             },
-            "expected_time_window_minutes": self._estimate_time_window(prediction["current_state"]),
+            "expected_time_window_minutes": self._estimate_time_window(prediction["current_state"], features),
             "location_candidates": location_candidates,
             "potential_exposure_inr": exposure,
             "intervention_priority": prediction["intervention_priority"],
@@ -436,7 +436,7 @@ class CyberFlowClassifierEngine:
                 "predicted": predicted_action,
                 "probabilities": action_probs
             },
-            "expected_time_window_minutes": self._estimate_time_window(state),
+            "expected_time_window_minutes": self._estimate_time_window(state, features),
             "location_candidates": location_candidates,
             "potential_exposure_inr": exposure,
             "intervention_priority": priority,
@@ -522,9 +522,9 @@ class CyberFlowClassifierEngine:
 
         return explanation[:7]  # Contract expects 5-7 bullets
 
-    def _estimate_time_window(self, state):
-        """Estimate expected time window based on current state."""
-        windows = {
+    def _estimate_time_window(self, state, features=None):
+        """Estimate expected time window based on current state and transaction velocity."""
+        base_windows = {
             "emerging": [30, 60],
             "collection": [20, 45],
             "distribution": [15, 35],
@@ -532,7 +532,23 @@ class CyberFlowClassifierEngine:
             "consolidation": [10, 25],
             "cashout_prep": [5, 15],
         }
-        return windows.get(state, [15, 30])
+        window = base_windows.get(state, [15, 30])
+        
+        # Data-driven adjustment: higher velocity = shorter time window
+        if features and "velocity_tx_per_min" in features:
+            velocity = features["velocity_tx_per_min"]
+            # e.g., if velocity > 2.0 tx/min, shrink window by 40%
+            # if velocity < 0.5 tx/min, expand window by 50%
+            if velocity > 2.0:
+                multiplier = 0.6
+            elif velocity < 0.5:
+                multiplier = 1.5
+            else:
+                multiplier = 1.0 - ((velocity - 0.5) / 1.5) * 0.4
+                
+            window = [max(1, int(window[0] * multiplier)), max(2, int(window[1] * multiplier))]
+            
+        return window
 
     def _compute_simulations(self, exposure, location_candidates, graph_dict):
         """

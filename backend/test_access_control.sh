@@ -57,3 +57,4 @@ kill $SERVER_PID
 wait $SERVER_PID 2>/dev/null
 rm -f $AUTH_USERS_FILE
 echo "Done."
+

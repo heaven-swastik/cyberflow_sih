@@ -4,14 +4,13 @@
  *
  * Usage:
  *   VITE_USE_MOCK=true  → reads from embedded case_export.json (default)
- *   VITE_USE_MOCK=false → fetches from VITE_API_BASE (default http://localhost:3001/api)
+ *   VITE_USE_MOCK=false → fetches from VITE_API_BASE (default http://localhost:5000/api)
  */
 
 import mockData from '../data/caseExport.json';
-import { auth } from '../firebase';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
 
 // --------------- helpers ---------------
 
@@ -22,16 +21,8 @@ function delay(ms = 80) {
 async function fetchJSON(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
 
-  // Attach Firebase ID token if user is authenticated (for JWT-protected backend routes)
-  try {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      const token = await currentUser.getIdToken();
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-  } catch (_) {
-    // Auth not available — proceed without token (demo/mock mode)
-  }
+  const token = localStorage.getItem('cyberflow_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -53,6 +44,11 @@ export async function getOverview() {
     return mockData.overview;
   }
   return fetchJSON('/overview');
+}
+
+export async function getMyCases() {
+  if (USE_MOCK) { await delay(); return []; }
+  return fetchJSON('/my-cases');
 }
 
 export async function getCases() {
@@ -170,6 +166,14 @@ export async function getAlerts() {
     return [...mockAlerts];
   }
   return fetchJSON('/alerts');
+}
+
+export async function getBlockchainVerify() {
+  return fetchJSON('/blockchain/verify');
+}
+
+export async function healBlockchain() {
+  return fetchJSON('/blockchain/heal', { method: 'POST' });
 }
 
 export async function getFeed(count = 5) {

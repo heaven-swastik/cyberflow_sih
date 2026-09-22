@@ -4,20 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 4173 --strictPort",
+    "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort"
+    "preview": "vite preview --host 0.0.0.0 --port 5173 --strictPort"
   },
   "dependencies": {
     "d3-force-3d": "^3.0.6",
-    "firebase": "^12.19.0",
     "framer-motion": "^13.1.1",
-    "leaflet": "^1.9.4",
+    "maplibre-gl": "^6.10.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-force-graph-2d": "^1.29.1",
-    "react-leaflet": "^5.0.0"
+    "react-force-graph-2d": "^1.29.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

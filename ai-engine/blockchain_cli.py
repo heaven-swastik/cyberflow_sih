@@ -22,6 +22,16 @@ def verify():
     result = bc.verify_chain()
     print(json.dumps(result))
 
+def heal_chain():
+    bc = get_chain()
+    # Simple heal: recalculate hashes for all blocks based on current data
+    if len(bc.chain) > 1:
+        for i in range(1, len(bc.chain)):
+            bc.chain[i].previous_hash = bc.chain[i-1].hash
+            bc.chain[i].hash = bc.chain[i].calculate_hash()
+        bc.save(CHAIN_PATH)
+    print(json.dumps({"status": "healed", "length": len(bc.chain)}))
+
 def get_all():
     bc = get_chain()
     print(json.dumps(bc.export_chain()))
@@ -51,6 +61,8 @@ if __name__ == "__main__":
         add_record(record_type, case_id, data)
     elif action == "verify":
         verify()
+    elif action == "heal-chain":
+        heal_chain()
     elif action == "get_all":
         get_all()
     elif action == "get_case":
