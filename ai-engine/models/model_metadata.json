@@ -1,0 +1,73 @@
+{
+  "state_classes": [
+    "emerging",
+    "collection",
+    "distribution",
+    "layering",
+    "consolidation",
+    "cashout_prep"
+  ],
+  "action_classes": [
+    "cashout",
+    "further_layering",
+    "external_transfer",
+    "other"
+  ],
+  "priority_classes": [
+    "LOW",
+    "MEDIUM",
+    "HIGH"
+  ],
+  "feature_columns": [
+    "total_volume",
+    "tx_count",
+    "max_amount",
+    "min_amount",
+    "mean_amount",
+    "std_amount",
+    "velocity_tx_per_min",
+    "time_span_sec",
+    "min_inter_arrival_sec",
+    "mean_inter_arrival_sec",
+    "std_inter_arrival_sec",
+    "rapid_tx_count",
+    "burst_ratio",
+    "num_nodes",
+    "num_edges",
+    "max_fan_in",
+    "max_fan_out",
+    "mean_fan_in",
+    "mean_fan_out",
+    "sources_only_count",
+    "sinks_only_count",
+    "convergence_ratio",
+    "max_betweenness",
+    "mean_betweenness",
+    "hop_depth",
+    "zone_a_frac",
+    "zone_b_frac",
+    "zone_c_frac",
+    "num_zones_active",
+    "ft_investment_scam",
+    "ft_digital_arrest",
+    "ft_fake_payment_gateway",
+    "ft_legitimate_business",
+    "account_reuse_ratio",
+    "amount_cv",
+    "max_to_mean_amount_ratio",
+    "recurring_amount_ratio",
+    "distinct_device_count",
+    "device_consistency_ratio",
+    "business_hours_ratio",
+    "hour_of_day_std",
+    "max_zone_distance_km"
+  ],
+  "training_samples": 1000,
+  "test_accuracy": {
+    "state": 1.0,
+    "action": 0.935,
+    "priority": 0.93,
+    "risk_r2": 0.9965732169426834,
+    "risk_mae": 0.009127490037679667
+  }
+}

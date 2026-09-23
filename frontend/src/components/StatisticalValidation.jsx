@@ -1,0 +1,115 @@
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { getFeatureAnalysis, getEvaluationReport } from '../api';
+
+// Features we highlight as the "headline" contrast — amount alone
+// (not significant) vs. behavioural signals (highly significant).
+// Falls back gracefully if any of these aren't present in the report.
+const HEADLINE_FEATURES = ['max_amount', 'device_consistency_ratio', 'account_reuse_ratio'];
+
+function findSignificance(featureAnalysis, featureName) {
+  const list = featureAnalysis?.feature_fraud_vs_legitimate?.results;
+  if (!Array.isArray(list)) return null;
+  return list.find((f) => f.feature === featureName) || null;
+}
+
+export default function StatisticalValidation() {
+  const [featureAnalysis, setFeatureAnalysis] = useState(null);
+  const [evaluation, setEvaluation] = useState(null);
+  const [status, setStatus] = useState('loading'); // loading | ready | error
+
+  useEffect(() => {
+    Promise.all([getFeatureAnalysis(), getEvaluationReport()])
+      .then(([fa, ev]) => {
+        setFeatureAnalysis(fa);
+        setEvaluation(ev);
+        setStatus('ready');
+      })
+      .catch(() => setStatus('error'));
+  }, []);
+
+  if (status === 'loading') return null;
+  if (status === 'error' || (!featureAnalysis && !evaluation)) return null;
+
+  const rows = HEADLINE_FEATURES.map((f) => ({
+    feature: f,
+    stat: findSignificance(featureAnalysis, f),
+  })).filter((r) => r.stat);
+
+  const cm = evaluation?.confusion_matrix;
+  const metrics = evaluation?.metrics;
+
+  return (
+    <motion.div
+      className="stat-validation-card"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      <div className="stat-validation-title">📊 Statistical Validation — real numbers, not claims</div>
+      <div className="stat-validation-sub">
+        Before we trust any feature, we test it: Pearson correlation + significance tests across{' '}
+        {featureAnalysis?.method?.n_features_tested ?? 42} features on{' '}
+        {featureAnalysis?.method?.n_cases ?? 1000} synthetic cases, plus a held-out evaluation for
+        false positives. This is why CyberFlow never flags on transaction amount alone.
+      </div>
+
+      {rows.length > 0 && (
+        <div className="stat-validation-grid">
+          {rows.map(({ feature, stat }) => {
+            const p = stat.p_value;
+            const significant =
+              stat['significant_at_0.05'] ?? (p != null && p < (featureAnalysis?.method?.alpha ?? 0.05));
+            return (
+              <div key={feature} className={`stat-p-row ${significant ? 'significant' : 'not-significant'}`}>
+                <div className="stat-p-feature">{feature.replace(/_/g, ' ')}</div>
+                <div className={`stat-p-value ${significant ? 'significant' : 'not-significant'}`}>
+                  p {p < 0.001 ? '< 0.001' : `= ${p.toFixed(2)}`}
+                </div>
+                <div className="stat-p-verdict">
+                  {significant ? 'Statistically significant' : 'Not significant — proves nothing alone'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {cm && metrics && (
+        <>
+          <div className="stat-validation-title" style={{ fontSize: '0.82rem', marginTop: 4 }}>
+            False-positive testing — legitimate-business held-out set
+          </div>
+          <div className="stat-confusion-grid">
+            <div className="stat-confusion-cell">
+              <div className="stat-confusion-value">{cm.true_negative_legit_correctly_cleared}</div>
+              <div className="stat-confusion-label">Legit correctly cleared</div>
+            </div>
+            <div className="stat-confusion-cell">
+              <div className="stat-confusion-value">{cm.false_positive_legit_flagged_as_fraud}</div>
+              <div className="stat-confusion-label">Legit wrongly flagged</div>
+            </div>
+            <div className="stat-confusion-cell">
+              <div className="stat-confusion-value">{cm.true_positive_fraud_correctly_flagged}</div>
+              <div className="stat-confusion-label">Fraud correctly flagged</div>
+            </div>
+            <div className="stat-confusion-cell">
+              <div className="stat-confusion-value">{cm.false_negative_fraud_missed}</div>
+              <div className="stat-confusion-label">Fraud missed</div>
+            </div>
+          </div>
+          <div className="stat-validation-sub" style={{ marginTop: 10, marginBottom: 0 }}>
+            Precision {(metrics.precision * 100).toFixed(0)}% · Recall{' '}
+            {(metrics.recall * 100).toFixed(1)}% · F1 {(metrics.f1_score * 100).toFixed(1)}% · False
+            positive rate {(metrics.false_positive_rate * 100).toFixed(0)}%
+          </div>
+        </>
+      )}
+
+      <div className="stat-validation-footnote">
+        {evaluation?.disclaimer ||
+          'Measured on a synthetic held-out test set generated by this prototype — reported for demonstration purposes, not as evidence of accuracy on real cases.'}
+      </div>
+    </motion.div>
+  );
+}

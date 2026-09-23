@@ -1,0 +1,22 @@
+[
+  {
+    "index": 0,
+    "timestamp": "2026-09-23T06:17:35Z",
+    "record_type": "genesis",
+    "case_id": "SYSTEM",
+    "data_hash": "2a7a54ada839dea996e4e5652d003d71243aad12a5d4b23e7c5ad5cca6b58db1",
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "nonce": 419,
+    "hash": "0069bf8f050425a6470f86b5893782cbc19fea61bb2118cae525f775a21e49c8"
+  },
+  {
+    "index": 1,
+    "timestamp": "2026-09-23T06:17:35Z",
+    "record_type": "alert_dispatched",
+    "case_id": "CF-3001",
+    "data_hash": "5a337fb5bae46367b34c1f0b46af82d73141c9386e39a206fb7c360756bd1cd1",
+    "prev_hash": "0069bf8f050425a6470f86b5893782cbc19fea61bb2118cae525f775a21e49c8",
+    "nonce": 491,
+    "hash": "009fee589540390df72212468ac96cc18fe5ceeffb4669c7c3662364e08a3bf4"
+  }
+]
