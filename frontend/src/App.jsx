@@ -4,6 +4,7 @@ import { getCase, getOverview, getCases, generateAlert } from './api';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
 import Sidebar from './components/Sidebar';
+import MacroHeatmap from './components/MacroHeatmap';
 import ComplaintTracker from './components/ComplaintTracker';
 import AdminPanel from './components/AdminPanel';
 import HeroSection from './components/HeroSection';
@@ -40,6 +41,7 @@ function AppContent() {
 
   // Auth-related overlays
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showMacroHeatmap, setShowMacroHeatmap] = useState(false);
   const [showComplaintTracker, setShowComplaintTracker] = useState(false);
   const [userCaseIds, setUserCaseIds] = useState([]);
 
@@ -232,8 +234,7 @@ function AppContent() {
   const handleCaseCreated = useCallback((caseId) => {
     setUserCaseIds((prev) => [...prev, caseId]);
     setShowComplaintPortal(false);
-    openCase(caseId);
-  }, [openCase]);
+  }, []);
 
   // Auth loading
   if (authLoading) {
@@ -269,6 +270,7 @@ function AppContent() {
         onOpenComplaintPortal={() => setShowComplaintPortal(true)}
         onOpenApiIntegration={() => setShowApiIntegration(true)}
         onOpenAdminPanel={() => setShowAdminPanel(true)}
+          onOpenMacroHeatmap={() => setShowMacroHeatmap(true)}
         onOpenComplaintTracker={() => setShowComplaintTracker(true)}
         onLogin={() => setView('login')}
         onLogout={logout}
@@ -328,8 +330,8 @@ function AppContent() {
             exit={{ opacity: 0, x: -30 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
-            <HeroSection activeCases={overviewData?.active_cases} onRunSimulation={handleRunSimulation} />
-            <HowItWorks />
+            {!isComplainant && <HeroSection activeCases={overviewData?.active_cases} onRunSimulation={handleRunSimulation} />}
+            {!isComplainant && <HowItWorks />}
 
             {/* Conditional Action Buttons */}
             <div className="landing-actions-row">
@@ -369,7 +371,7 @@ function AppContent() {
               </>
             )}
             {isAuthenticated && isComplainant && (
-              <ComplainantDashboard onOpenCase={openCase} userCaseIds={userCaseIds} onFileComplaint={() => setShowComplaintPortal(true)} />
+              <ComplainantDashboard onFileComplaint={() => setShowComplaintPortal(true)} />
             )}
             {!isAuthenticated && (
               <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
@@ -470,6 +472,12 @@ function AppContent() {
       <GuardrailFooter />
 
       {/* Admin Panel overlay */}
+      {showMacroHeatmap && (
+        <MacroHeatmap
+          onClose={() => setShowMacroHeatmap(false)}
+          onOpenCase={(caseId) => { setShowMacroHeatmap(false); openCase(caseId); }}
+        />
+      )}
       {showAdminPanel && (
         <AdminPanel
           onClose={() => setShowAdminPanel(false)}

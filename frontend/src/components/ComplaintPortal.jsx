@@ -82,65 +82,12 @@ export default function ComplaintPortal({ onCaseCreated, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
               ✅ Complaint filed — Case ID <span className="mono" style={{ color: 'var(--accent)' }}>{result.case_id}</span>
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
               Priority: <strong style={{ color: 'var(--text-primary)' }}>{result.case.intervention_priority}</strong>
               {'  ·  '}
               Risk: <strong style={{ color: 'var(--text-primary)' }}>{Math.round(result.case.network_risk * 100)}%</strong>
               {'  ·  '}
               State: <strong style={{ color: 'var(--text-primary)' }}>{result.case.current_state}</strong>
-            </div>
-            {form.fraud_type === 'legitimate_business' && (
-              <div
-                style={{
-                  fontSize: 13,
-                  marginTop: 8,
-                  padding: '8px 10px',
-                  borderRadius: 6,
-                  border: `1px solid var(--severity-clear)`,
-                  color: 'var(--severity-clear)',
-                }}
-              >
-                {result.case.intervention_priority === 'LOW'
-                  ? '✅ Correctly cleared as low-risk — the false-positive safeguard worked as intended.'
-                  : '⚠ Flagged despite being a legitimate-transaction test case — open the Prediction step to see why.'}
-              </div>
-            )}
-
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
-              {result.synthetic_data_notice}
-            </div>
-            <div className="complaint-pipeline-preview">
-              <div className="complaint-pipeline-preview-title">What just ran, end to end:</div>
-              <div className="complaint-pipeline-preview-steps">
-                <span>✓ Validated ({result.data_validation?.stats?.transaction_count ?? '—'} tx)</span>
-                <span className="complaint-pipeline-arrow">→</span>
-                <span>✓ 42 features engineered</span>
-                <span className="complaint-pipeline-arrow">→</span>
-                <span>✓ Statistically tested</span>
-                <span className="complaint-pipeline-arrow">→</span>
-                <span>✓ ML prediction</span>
-                <span className="complaint-pipeline-arrow">→</span>
-                <span>✓ Zone/ATM ranked</span>
-                <span className="complaint-pipeline-arrow">→</span>
-                <span>Ready to alert</span>
-              </div>
-              <div className="complaint-pipeline-preview-sub">
-                Click below to walk through each of these stages exactly as they ran, one screen at a
-                time — same case, same numbers.
-              </div>
-            </div>
-
-            <div className="model-provenance-card">
-              <div className="model-provenance-title">How this connects to our existing data</div>
-              <div className="model-provenance-body">
-                Case <strong className="mono">{result.case_id}</strong> was <strong>not</strong> added to a
-                growing pile the model has to re-learn from. It was scored in real time by the exact same
-                XGBoost model file, trained once offline on our 1,000-case dataset (100% precision · 0/30
-                false positives on held-out legitimate cases · R² 0.997 on risk). Training happens once;
-                every new complaint — this one included — is just 42 numbers read by that fixed model in
-                milliseconds. That's also why the numbers above are reproducible: score this case again and
-                the model gives the identical answer, because nothing about it retrains on the fly.
-              </div>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
               <button className="btn btn-primary" onClick={() => onCaseCreated?.(result.case_id)}>

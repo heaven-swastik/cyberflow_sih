@@ -5,13 +5,9 @@ import { getMyCases } from '../api';
 
 const priorityColor = (p) => (p === 'HIGH' ? '#e4483f' : p === 'MEDIUM' ? '#e2954a' : '#41dc8f');
 
-const STAGE_MAP = {
-  emerging: 'Under Analysis', collection: 'Under Analysis', distribution: 'Investigation Active',
-  layering: 'Investigation Active', consolidation: 'Alert Dispatched', cashout_prep: 'Alert Dispatched',
-};
-const stageLabel = (state) => STAGE_MAP[state] || 'Filed';
+const statusLabel = (caseItem) => caseItem.prediction_outcome?.status === 'confirmed_correct' ? 'Solved' : 'Pending';
 
-export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
+export default function ComplainantDashboard({ onFileComplaint }) {
   const { user } = useAuth();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,12 +20,9 @@ export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
 
   const stats = useMemo(() => {
     const total = cases.length;
-    const highPriority = cases.filter((c) => c.intervention_priority === 'HIGH').length;
-    const avgRisk = total
-      ? Math.round((cases.reduce((sum, c) => sum + (c.network_risk || 0), 0) / total) * 100)
-      : 0;
-    const totalExposure = cases.reduce((sum, c) => sum + (c.potential_exposure_inr || 0), 0);
-    return { total, highPriority, avgRisk, totalExposure };
+    const pending = cases.filter((c) => statusLabel(c) === 'Pending').length;
+    const solved = cases.filter((c) => statusLabel(c) === 'Solved').length;
+    return { total, pending, solved };
   }, [cases]);
 
   return (
@@ -72,7 +65,6 @@ export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06 }}
-                  onClick={() => onOpenCase(c.case_id)}
                 >
                   <div className="complainant-case-card-top">
                     <div className="complainant-case-id-row">
@@ -88,7 +80,7 @@ export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
                         {c.intervention_priority || 'LOW'}
                       </span>
                     </div>
-                    <span className="complainant-case-stage">{stageLabel(c.current_state)}</span>
+                    <span className="complainant-case-stage">{statusLabel(c)}</span>
                   </div>
 
                   <div className="complainant-case-metrics">
@@ -113,13 +105,12 @@ export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
                     </div>
                   </div>
 
-                  <div className="complainant-case-cta">View full investigation →</div>
                 </motion.div>
               ))}
             </div>
           </div>
 
-          {/* ── Right: pictorial summary rail ── */}
+          {/* ── Right: status summary rail ── */}
           <div className="dashboard-side">
             <div className="complainant-stat-tiles">
               <div className="complainant-stat-tile">
@@ -130,24 +121,24 @@ export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
                 </div>
               </div>
               <div className="complainant-stat-tile">
-                <div className="complainant-stat-icon" style={{ background: 'rgba(228,72,63,0.14)', color: '#e4483f' }}>🚨</div>
+                <div className="complainant-stat-icon" style={{ background: 'rgba(226,149,74,0.14)', color: '#e2954a' }}>⏳</div>
                 <div>
-                  <div className="complainant-stat-value">{stats.highPriority}</div>
-                  <div className="complainant-stat-label">High Priority</div>
+                  <div className="complainant-stat-value">{stats.pending}</div>
+                  <div className="complainant-stat-label">Pending</div>
                 </div>
               </div>
               <div className="complainant-stat-tile">
-                <div className="complainant-stat-icon" style={{ background: 'rgba(226,149,74,0.14)', color: '#e2954a' }}>📈</div>
+                <div className="complainant-stat-icon" style={{ background: 'rgba(65,220,143,0.14)', color: '#41dc8f' }}>✓</div>
                 <div>
-                  <div className="complainant-stat-value">{stats.avgRisk}%</div>
-                  <div className="complainant-stat-label">Avg. Network Risk</div>
+                  <div className="complainant-stat-value">{stats.solved}</div>
+                  <div className="complainant-stat-label">Solved</div>
                 </div>
               </div>
               <div className="complainant-stat-tile">
-                <div className="complainant-stat-icon" style={{ background: 'rgba(91,143,214,0.14)', color: '#5b8fd6' }}>◈</div>
+                <div className="complainant-stat-icon" style={{ background: 'rgba(91,143,214,0.14)', color: '#5b8fd6' }}>ℹ</div>
                 <div>
-                  <div className="complainant-stat-value">₹{(stats.totalExposure / 100000).toFixed(1)}L</div>
-                  <div className="complainant-stat-label">Total Exposure</div>
+                  <div className="complainant-stat-value">Status</div>
+                  <div className="complainant-stat-label">Check back for updates</div>
                 </div>
               </div>
             </div>
@@ -155,9 +146,8 @@ export default function ComplainantDashboard({ onOpenCase, onFileComplaint }) {
             <div className="complainant-helper-card">
               <div className="complainant-helper-title">What happens next?</div>
               <div className="complainant-helper-text">
-                Every complaint is automatically screened, classified and — where
-                the evidence supports it — routed to an active investigation with
-                predicted cash-out tracking. You can check back here any time.
+                Your complaint status will appear here after submission. Check back
+                later for updates from the investigation team.
               </div>
             </div>
           </div>

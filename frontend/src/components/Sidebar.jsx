@@ -21,7 +21,7 @@ export default function Sidebar({
   isOfficer,
   onGoDashboard,
   onOpenComplaintPortal,
-  onOpenAdminPanel,
+  onOpenAdminPanel, onOpenMacroHeatmap,
   onOpenComplaintTracker,
   onOpenApiIntegration,
   onLogout,
@@ -49,14 +49,6 @@ export default function Sidebar({
         )}
         {isAuthenticated && isComplainant && (
           <NavIcon
-            icon="📝"
-            label="My Complaints"
-            active={false}
-            onClick={onOpenComplaintTracker}
-          />
-        )}
-        {isAuthenticated && isComplainant && (
-          <NavIcon
             icon="➕"
             label="File a Complaint"
             active={false}
@@ -69,6 +61,15 @@ export default function Sidebar({
             label="API Integration Demo"
             active={false}
             onClick={onOpenApiIntegration}
+          />
+        )}
+        {isAuthenticated && isAdmin && (
+          <NavIcon
+            icon="🌐"
+            label="Command Center"
+            active={false}
+            accentColor="#3182ce"
+            onClick={onOpenMacroHeatmap}
           />
         )}
         {isAuthenticated && isAdmin && (

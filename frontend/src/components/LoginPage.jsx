@@ -51,6 +51,7 @@ const LoginPage = ({ onLoginSuccess, onBack }) => {
   const [tab, setTab] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState('user');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [errors, setErrors] = useState({});
@@ -78,7 +79,7 @@ const LoginPage = ({ onLoginSuccess, onBack }) => {
       if (tab === 'register') {
         await signup(email, password, displayName);
       } else {
-        await login(email, password);
+        await login(email, password, selectedRole);
       }
       if (onLoginSuccess) onLoginSuccess();
     } catch (err) {
@@ -172,6 +173,20 @@ const LoginPage = ({ onLoginSuccess, onBack }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {tab === 'signin' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label htmlFor="login-role" style={{ fontSize: '0.8rem', color: '#718096', fontWeight: 600 }}>Sign in as</label>
+              <select
+                id="login-role"
+                value={selectedRole}
+                onChange={e => { setSelectedRole(e.target.value); setGlobalError(''); }}
+                style={{ width: '100%', padding: '0.8rem 1rem', background: '#ffffff', border: '2px solid #eaedf1', borderRadius: 12, color: '#2d3748', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             {tab === 'register' && (
               <motion.div key="name" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>

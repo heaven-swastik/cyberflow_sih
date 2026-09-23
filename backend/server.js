@@ -14,7 +14,7 @@ const jwt = require('jsonwebtoken');
 const app = express();
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
 app.use(express.json());
@@ -189,6 +189,7 @@ app.post('/api/auth/register',
 app.post('/api/auth/login',
   body('email').isEmail().normalizeEmail(),
   body('password').isString().notEmpty(),
+  body('role').optional().isIn(['admin', 'user']).withMessage('Role must be admin or user'),
   (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: 'Email and password are required' });
@@ -196,6 +197,11 @@ app.post('/api/auth/login',
     if (!user || !bcrypt.compareSync(req.body.password, user.passwordHash)) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
+    const requestedRole = req.body.role || 'user';
+    const roleMatches = requestedRole === 'admin'
+      ? user.role === 'admin'
+      : user.role !== 'admin';
+    if (!roleMatches) return res.status(403).json({ error: `This account is not registered as ${requestedRole === 'admin' ? 'an admin' : 'a user'}` });
     res.json({ token: createToken(user), user: publicUser(user) });
   }
 );
@@ -216,6 +222,91 @@ app.get('/api/overview', authenticateToken, requireRole('admin', 'officer'), (re
   const potential_exposure_inr = cases.reduce((sum, c) => sum + (c.potential_exposure_inr || 0), 0);
 
   res.json({ active_cases, high_priority, predicted_cashout, potential_exposure_inr });
+});
+
+// ── Zone reference metadata (mirrors ai-engine/atm_engine.py ZONE_HUBS) ──
+// Small static lookup — zones are fixed constants in this prototype, so
+// this is not duplicated ML logic, just display/aggregation metadata.
+const ZONE_HUBS = {
+  zone_a: { lat: 28.6139, lng: 77.2090, city: 'Delhi NCR', label: 'Zone A (Delhi Hub)', jurisdiction: 'Delhi Police Cyber Cell (IFSO)', state: 'Delhi' },
+  zone_b: { lat: 22.5726, lng: 88.3639, city: 'Kolkata', label: 'Zone B (Kolkata Hub)', jurisdiction: 'Kolkata Police Cyber Crime PS', state: 'West Bengal' },
+  zone_c: { lat: 19.0760, lng: 72.8777, city: 'Mumbai', label: 'Zone C (Mumbai Hub)', jurisdiction: 'Mumbai Cyber Crime Investigation Cell', state: 'Maharashtra' },
+};
+
+// ── Macro Risk Heatmap (Command Center) ──
+// Real aggregation over every case currently loaded (data.cases) — no
+// hardcoded hotspots. Groups by top predicted zone, with optional
+// server-side filtering by crime category (fraud_type) and time window,
+// so the frontend's filter controls do something real instead of being
+// decorative. This is the "Level 1 — Command Center" macro layer that
+// sits alongside (not instead of) the existing per-case investigation
+// view. Every zone in the response also carries the case_ids that make
+// it up, so the frontend can drill down into a specific case from a
+// cluster — same case objects served by /api/cases/:case_id.
+app.get('/api/macro/heatmap', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
+  const cases = data.cases || [];
+  const { crime_category, time_window } = req.query; // time_window: '24h' | '7d' | '30d' | 'all'
+
+  const now = Date.now();
+  const windowMs = { '24h': 24 * 3600e3, '7d': 7 * 24 * 3600e3, '30d': 30 * 24 * 3600e3 };
+
+  const filtered = cases.filter(c => {
+    if (crime_category && crime_category !== 'all' && c.fraud_type !== crime_category) return false;
+    if (time_window && time_window !== 'all' && windowMs[time_window]) {
+      const t = Date.parse(c.updated_at || c.complaint?.filed_at || '');
+      if (!Number.isNaN(t) && (now - t) > windowMs[time_window]) return false;
+      // If the case has no parseable timestamp, don't silently drop it —
+      // an undated case is still real intelligence, just undated.
+    }
+    return true;
+  });
+
+  // Aggregate by each case's TOP predicted zone (location_candidates[0]).
+  const byZone = {};
+  for (const zoneId of Object.keys(ZONE_HUBS)) {
+    byZone[zoneId] = {
+      zone_id: zoneId,
+      ...ZONE_HUBS[zoneId],
+      case_count: 0,
+      high_priority_count: 0,
+      total_exposure_inr: 0,
+      avg_confidence: 0,
+      case_ids: [],
+      fraud_type_breakdown: {},
+    };
+  }
+
+  for (const c of filtered) {
+    const topLoc = (c.location_candidates || [])[0];
+    if (!topLoc || !byZone[topLoc.zone_id]) continue;
+    const z = byZone[topLoc.zone_id];
+    z.case_count += 1;
+    if (c.intervention_priority === 'HIGH') z.high_priority_count += 1;
+    z.total_exposure_inr += (c.potential_exposure_inr || 0);
+    z._confidenceSum = (z._confidenceSum || 0) + topLoc.confidence;
+    z.case_ids.push(c.case_id);
+    const ft = c.fraud_type || 'unknown';
+    z.fraud_type_breakdown[ft] = (z.fraud_type_breakdown[ft] || 0) + 1;
+  }
+
+  const zones = Object.values(byZone).map(z => {
+    const avg_confidence = z.case_count > 0 ? Math.round((z._confidenceSum / z.case_count) * 100) / 100 : 0;
+    delete z._confidenceSum;
+    // Real-time risk (active HIGH-priority cases right now) vs potential
+    // risk (this zone's overall predicted-cashout confidence) are kept
+    // as two distinct numbers rather than one blended score, per the PS's
+    // "real-time risk zones" vs "potential risk zones" distinction.
+    const real_time_risk = z.case_count === 0 ? 'none' : (z.high_priority_count > 0 ? 'critical' : 'elevated');
+    const potential_risk = avg_confidence >= 0.7 ? 'high' : avg_confidence >= 0.4 ? 'medium' : 'low';
+    return { ...z, avg_confidence, real_time_risk, potential_risk };
+  });
+
+  res.json({
+    generated_at: new Date().toISOString(),
+    filters_applied: { crime_category: crime_category || 'all', time_window: time_window || 'all' },
+    total_cases_considered: filtered.length,
+    zones,
+  });
 });
 
 app.get('/api/cases', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
@@ -310,6 +401,23 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
     'Rapid redistribution + network convergence + historical behavioural similarity.';
 
   const topAtm = c.atm_candidates?.[0];
+  const topZoneId = c.location_candidates?.[0]?.zone_id || "zone_a";
+  const predictedJurisdiction = ZONE_HUBS[topZoneId]?.jurisdiction || c.predicted_jurisdiction || "Cyber Cell (zone unresolved)";
+  const originatingJurisdiction = c.originating_jurisdiction || "Not specified at intake";
+
+  // Cross-jurisdictional, role-aware dispatch. Every recipient is paired
+  // with the channel(s) the PS asks for (SMS / email / API / dashboard).
+  // This prototype does not call a real SMS gateway or bank API — every
+  // channel entry is explicitly marked "simulated" rather than silently
+  // implying delivery, per the honest-labeling pattern used throughout
+  // this codebase (see SIH_PITCH.md "Implemented vs future work").
+  const channels = [
+    { recipient: predictedJurisdiction, role: 'LEA (responding jurisdiction)', channel: 'dashboard', status: 'simulated' },
+    { recipient: predictedJurisdiction, role: 'LEA (responding jurisdiction)', channel: 'sms', status: 'simulated' },
+    { recipient: `Originating IO — ${originatingJurisdiction}`, role: 'LEA (originating officer)', channel: 'email', status: 'simulated' },
+    { recipient: topAtm?.bank_name ? `${topAtm.bank_name} Fraud Ops` : 'Bank Fraud Ops', role: 'Bank/FI', channel: 'api', status: 'simulated' },
+    { recipient: 'I4C National Coordination Desk', role: 'I4C', channel: 'dashboard', status: 'simulated' },
+  ];
 
   const alertFields = {
     alert_id,
@@ -319,13 +427,16 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
     predicted_next_action: c.next_action?.predicted,
     probability: c.next_action?.probabilities?.[c.next_action?.predicted] || 0,
     expected_window: `${windowStart}-${windowEnd}`,
-    top_location: c.location_candidates?.[0]?.zone_id || "zone_a",
+    top_location: topZoneId,
     predicted_atm_id: topAtm?.atm_id || null,
     predicted_atm_bank: topAtm?.bank_name || null,
     predicted_atm_address: topAtm?.address || null,
     potential_exposure_inr: c.potential_exposure_inr,
     intervention_priority: c.intervention_priority,
-    sent_to: ["LEA Cyber Cell", topAtm?.bank_name ? `${topAtm.bank_name} Fraud Ops` : "Bank Fraud Ops"],
+    predicted_jurisdiction: predictedJurisdiction,
+    originating_jurisdiction: originatingJurisdiction,
+    sent_to: ["LEA Cyber Cell", topAtm?.bank_name ? `${topAtm.bank_name} Fraud Ops` : "Bank Fraud Ops"], // kept for backward compatibility with existing UI reads
+    channels,
     reason,
   };
 
@@ -347,6 +458,34 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
 app.get('/api/alerts', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   res.json(data.alerts || []);
 });
+
+// ── Investigator verification / feedback loop ──
+// Lets an investigator record whether a predicted zone/ATM actually
+// matched what happened. This is captured for future evaluation only —
+// the prototype does NOT retrain models automatically from this data.
+// Distinct from /api/blockchain/verify, which checks hash-chain
+// tamper-evidence, not prediction correctness.
+app.patch('/api/cases/:case_id/outcome', authenticateToken, requireRole('admin', 'officer'),
+  body('status').isIn(['pending', 'confirmed_correct', 'incorrect']).withMessage('Invalid status'),
+  body('notes').optional().isString().trim().isLength({ max: 500 }),
+  (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+    }
+    const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
+    if (!c) return res.status(404).json({ error: "case not found" });
+
+    c.prediction_outcome = {
+      status: req.body.status,
+      verified_by: req.user.displayName || req.user.email,
+      verified_at: new Date().toISOString(),
+      notes: req.body.notes || null,
+    };
+
+    res.json({ case_id: c.case_id, prediction_outcome: c.prediction_outcome });
+  }
+);
 
 // ── Blockchain endpoints ──
 app.get('/api/blockchain', authenticateToken, requireRole('admin'), (req, res) => {

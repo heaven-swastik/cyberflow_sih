@@ -57,9 +57,9 @@ export function AuthProvider({ children }) {
 
   // ── Auth actions ──
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, selectedRole = 'user') => {
     const response = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, role: selectedRole }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Authentication failed');
