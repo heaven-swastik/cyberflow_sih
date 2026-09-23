@@ -7,54 +7,57 @@ CyberFlow is an advanced **Predictive Analytics Framework** designed to transiti
 ## 2. Core Problem Addressed
 The National Cybercrime Reporting Portal (NCRP) receives over 8,000 complaints daily. Currently, LEAs and banks act on these complaints *reactively*, often after funds have been withdrawn from ATMs or untraceable endpoints. 
 
-**The Solution:** CyberFlow intercepts complaint data in real-time, models the financial flow using Artificial Intelligence (AI), and predicts the exact hotspots and zones where the stolen funds are likely to surface next. This enables rapid deployment of local teams and immediate bank-level freezing.
+**The Solution:** CyberFlow intercepts complaint data in real-time, models the financial flow using Artificial Intelligence (AI) trained on massive historical datasets, and predicts the exact hotspots and zones where the stolen funds are likely to surface next. This enables rapid deployment of local teams and immediate bank-level freezing.
 
 ---
 
 ## 3. Key Deliverables & System Components
 
-### A. Predictive Analytics Engine
+### A. Predictive Analytics Engine (Powered by Historical Data)
 An AI/ML-powered core that analyzes financial data to detect patterns and predict withdrawal hotspots.
-*   **Graph-Theoretic Analysis:** Converts account-to-account transfers into directed networks. Extracts features like *fan-in*, *fan-out*, and *hop depth* to identify mule networks and consolidation hubs.
-*   **Machine Learning (XGBoost):** Classifies the current operational state of the fraud (e.g., *layering*, *consolidation*) and predicts the most likely next action with ~93.5% accuracy.
-*   **Geospatial Risk Modeling:** Ranks likely ATM and Cash-out zones based on device telemetry, historical fraud data, and network behavior.
-*   **Sequential Optimizer (Q-Learning):** A Reinforcement Learning model that recommends the optimal sequence of investigative steps for LEAs.
+*   **Historical Data Ingestion (Critical):** Our Predictive Engine continuously ingests bulk historical NCRP logs and bank CDRs to build the baseline for our Q-Learning and XGBoost models. When a new complaint arrives, it is evaluated against this massive historical baseline to predict the hotspot.
+*   **Graph-Theoretic Analysis:** Converts account-to-account transfers into directed networks to identify mule networks and consolidation hubs.
+*   **Machine Learning (XGBoost):** Classifies the operational state of the fraud (e.g., *layering*, *consolidation*) and predicts the most likely next action.
 
-### B. Risk Heatmap Dashboard (Map UI)
+### B. Risk Heatmap Dashboard (Macro & Micro GIS UI)
 A GIS-enabled, ultra-smooth 3D visual dashboard for operational command.
-*   **3D Geospatial Visualization:** Built on MapLibre with cinematic 3D pitch and smooth building extrusions, providing a premium "glass-pane" command view.
-*   **Real-time Risk Zones:** Visualizes emerging fraud clusters in real-time. 
-*   **Drill-Down Filters:** Allows officers to filter by time, location, confidence probability, and crime category.
-*   **Intervention Simulation:** LEAs can simulate the impact of blocking a specific ATM zone before actually executing the order.
+*   **Macro "Command Center" Heatmap:** A God's Eye View aggregating all 8,000+ daily complaints into a city-wide/state-wide heatmap. Features explicit drill-down filters for **Crime Category** (e.g., Investment Scams vs Digital Arrest) and **Time Window**. Commanders use this to view cross-jurisdictional threat clusters.
+*   **Micro "Case-Centric" Mapping:** Investigators drill down into individual complaints, visualizing the exact predicted ATM hotspots for a specific case with cinematic 3D pitch and building extrusions.
 
-### C. Law Enforcement Interface
-A highly secure, 5-stage wizard-driven portal designed for investigators.
-*   **Stage 1: Incident:** Intake summary, automated data validation, and evidence sufficiency scoring.
-*   **Stage 2: Correlate:** Force-directed transaction graphs mapping money flow and timeline stages.
-*   **Stage 3: Predict:** AI explanations, next-action probabilities, and RL-driven investigation recommendations.
-*   **Stage 4: Map:** 3D Cash-Out mapping and shortlist of probable ATMs.
-*   **Stage 5: Action Center:** One-click dispatch of actionable intelligence.
-*   **Role-Based Access Control (RBAC):** Strict JWT-based data segregation ensuring investigators only see authorized intelligence.
+### C. Law Enforcement Interface (Cross-Jurisdictional Intelligence)
+A highly secure, wizard-driven portal designed for investigators, actively breaking down physical jurisdictional barriers.
+*   **Cross-Jurisdictional Routing:** A major bottleneck is a victim in Delhi filing a complaint while the cash-out happens in Kolkata. CyberFlow features **Geo-Fenced Jurisdiction Mapping**. If a cross-border cash-out is predicted, the intelligence is simultaneously routed to *both* the local investigating officer and the remote physical intervention team.
+*   **Stage 1-5 Wizard:** From Incident Validation, to Entity Correlation (Graphing), AI Prediction, 3D Mapping, and final Action Center dispatch.
 
-### D. Alert & Notification System
+### D. Alert & Notification System (Multi-Channel Dispatch)
 A comprehensive dispatch engine ensuring intelligence reaches the right hands instantly.
-*   **Multi-Channel Dispatch:** Triggers real-time notifications to local police, nodal bank officers, and I4C via API, Dashboard Alerts, SMS, or Email.
+*   **Explicit Delivery Channels:** The platform does not rely solely on dashboard alerts. Alerts are simultaneously pushed to:
+    *   **Beat Officers:** via **SMS** Gateway (e.g., NIC/Twilio).
+    *   **Investigating Officers (IOs):** via **Email** alerts (AWS SES/SMTP).
+    *   **Financial Institutions:** via **API Bank Switch Holds** to instantly freeze funds.
+    *   **I4C Officers:** via **Dashboard Triggers**.
 *   **Blockchain-Backed Audit Trail:** Dispatched alerts are hashed and logged on a local PoW ledger to ensure non-repudiation and cross-agency trust.
-*   **Actionable Intelligence Payloads:** Alerts include exact coordinates, suspect bank names, confidence scores, and time-sensitivity windows, maximizing the chance of recovery.
+
+### E. 3-Layer Defense Architecture (Prediction Failsafe)
+CyberFlow does not rely on a single-point ATM prediction. It deploys a **multi-layered failsafe** to ensure fund recovery even when the Q-Learning model backtracks and shifts its prediction mid-operation:
+
+*   **Layer 1 — Digital Account Freeze (Location-Independent):** The moment a case is ingested, an automated NPCI Switch Hold freezes the identified mule account across **all ATMs nationwide**. Even if the predicted ATM changes 5 times, the criminal cannot withdraw from *any* machine. This is the ultimate failsafe — it is completely independent of which ATM the AI predicts.
+*   **Layer 2 — Zone-Based Deployment (Not Point Deployment):** Instead of dispatching a single officer to a single ATM, CyberFlow positions **multiple officers across the predicted zone**, each covering one of the top-ranked ATM candidates. When the prediction shifts from ATM-A to ATM-B within the same zone, the nearest pre-positioned officer is simply redirected — not dispatched from scratch.
+*   **Layer 3 — Real-Time Re-Dispatch:** When the Q-Learning model detects a node mismatch and backtracks, the system instantly pushes a **CANCEL** alert to the officer heading to the old ATM and a **NEW DISPATCH** to the nearest officer to the corrected ATM. The Action Center includes a live scenario simulation demonstrating this entire failsafe sequence in real-time.
 
 ---
 
 ## 4. Technical Architecture Stack
+*   **Frontend (UI/UX):** React.js + Vite. Designed with a premium, light-themed "Glass" UI using Framer Motion and MapLibre GL for 3D mapping.
+*   **Backend API:** Node.js + Express. Handles rate-limiting, JWT authentication, and headless integration endpoints (`/api/integration/predict`).
+*   **AI Engine:** Python (scikit-learn, XGBoost, NetworkX). Operates as an orchestrated subprocess.
 
-*   **Frontend (UI/UX):** React.js + Vite. Designed with a premium, light-themed "Glass" UI using Framer Motion for ultra-smooth transitions and MapLibre GL for 3D mapping.
-*   **Backend API:** Node.js + Express. Handles rate-limiting, JWT authentication, and headless integration endpoints (e.g., `/api/integration/predict`).
-*   **AI Engine:** Python (scikit-learn, XGBoost, NetworkX). Operates as an orchestrated subprocess, processing incoming complaints instantly.
-*   **Data Layer:** In-memory read-optimized JSON contracts with SQLite materialization for structured relational querying.
-
-## 5. Integration Strategy (B2G/B2B)
-CyberFlow is designed as an **Intelligence API Layer**, meaning it does not force the government to replace the NCRP.
-*   **Headless Integration:** State portals can securely push complaints to CyberFlow via API (`x-api-key`).
-*   **Instant Intelligence Return:** The engine processes the data and immediately returns a prediction contract (Risk score, predicted zones, and action plan) to the calling system.
+## 5. Logical Integration with NCRP/CFCFRMS Workflow
+CyberFlow is designed as an **Intelligence Middleware** that operates seamlessly between the Citizen Financial Cyber Fraud Reporting and Management System (CFCFRMS) and the State Police Investigation phase:
+1.  **Ingestion:** CyberFlow connects to the State Police API feed, intercepting tickets the moment a 1930 call is logged.
+2.  **NLP Extraction:** It instantly parses unstructured descriptions to extract Indicators of Interest (IOIs).
+3.  **Graphing & Prediction:** Cross-references IOIs against historical data to predict cash-out zones.
+4.  **Dossier Generation:** Presents the IO with a unified intelligence dossier and auto-dispatches alerts.
 
 ## 6. Business Impact
 By shifting from a reactive pipeline to a predictive framework, CyberFlow:
