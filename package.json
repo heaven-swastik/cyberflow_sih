@@ -1,0 +1,17 @@
+{
+  "name": "cyberflow",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CyberFlow — Proactive Cyber-Financial Crime Intelligence & Intervention System (SIH)",
+  "scripts": {
+    "setup": "python -m pip install -r ai-engine/requirements.txt && cd backend && npm install && cd ../frontend && npm install",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "concurrently -n BACKEND,FRONTEND -c yellow,cyan \"npm:backend\" \"npm:frontend\"",
+    "regenerate-data": "python ai-engine/run_demo.py",
+    "verify-ml": "python ai-engine/verify_ml.py"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

@@ -1,0 +1,344 @@
+{
+  "tables": [
+    {
+      "name": "Complainant",
+      "columns": [
+        "complainant_id",
+        "name",
+        "phone_masked",
+        "state",
+        "district"
+      ],
+      "row_count": 3
+    },
+    {
+      "name": "Complaint",
+      "columns": [
+        "complaint_id",
+        "complainant_id",
+        "filed_at",
+        "fraud_type",
+        "description",
+        "status",
+        "priority"
+      ],
+      "row_count": 3
+    },
+    {
+      "name": "Account",
+      "columns": [
+        "account_id",
+        "account_type",
+        "label",
+        "bank_name"
+      ],
+      "row_count": 33
+    },
+    {
+      "name": "ComplaintAccount",
+      "columns": [
+        "complaint_id",
+        "account_id",
+        "role"
+      ],
+      "row_count": 33
+    },
+    {
+      "name": "Transaction",
+      "columns": [
+        "txn_id",
+        "complaint_id",
+        "from_account_id",
+        "to_account_id",
+        "amount_inr",
+        "txn_timestamp",
+        "zone_id"
+      ],
+      "row_count": 34
+    },
+    {
+      "name": "Device",
+      "columns": [
+        "device_id",
+        "complaint_id",
+        "account_id",
+        "device_fingerprint",
+        "last_seen_minutes_ago"
+      ],
+      "row_count": 3
+    },
+    {
+      "name": "DeviceLocation",
+      "columns": [
+        "device_id",
+        "latitude",
+        "longitude",
+        "zone_id",
+        "recorded_at"
+      ],
+      "row_count": 3
+    },
+    {
+      "name": "ATM",
+      "columns": [
+        "atm_id",
+        "bank_name",
+        "latitude",
+        "longitude",
+        "address",
+        "city",
+        "zone_id"
+      ],
+      "row_count": 13
+    },
+    {
+      "name": "WithdrawalHistory",
+      "columns": [
+        "withdrawal_id",
+        "account_id",
+        "atm_id",
+        "amount_inr",
+        "days_ago",
+        "is_flagged"
+      ],
+      "row_count": 21
+    },
+    {
+      "name": "Prediction",
+      "columns": [
+        "prediction_id",
+        "complaint_id",
+        "predicted_atm_id",
+        "confidence",
+        "time_window_start_min",
+        "time_window_end_min",
+        "risk_score",
+        "model_mode",
+        "created_at"
+      ],
+      "row_count": 3
+    },
+    {
+      "name": "PredictionFeature",
+      "columns": [
+        "prediction_id",
+        "feature_name",
+        "rank_order"
+      ],
+      "row_count": 15
+    },
+    {
+      "name": "Alert",
+      "columns": [
+        "alert_id",
+        "complaint_id",
+        "sent_to",
+        "sent_at",
+        "status",
+        "alert_hash",
+        "prev_alert_hash"
+      ],
+      "row_count": 3
+    }
+  ],
+  "sample_queries": [
+    {
+      "title": "Resolve one complaint's full entity chain",
+      "sql": "SELECT c.complaint_id, a.account_id, a.account_type, t.to_account_id, t.amount_inr\nFROM Complaint c\nJOIN ComplaintAccount ca ON ca.complaint_id = c.complaint_id\nJOIN Account a ON a.account_id = ca.account_id\nJOIN \"Transaction\" t ON t.from_account_id = a.account_id\nWHERE c.complaint_id = 'CF-1042'\nLIMIT 8;",
+      "columns": [
+        "complaint_id",
+        "account_id",
+        "account_type",
+        "to_account_id",
+        "amount_inr"
+      ],
+      "rows": [
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1000",
+          "account_type": "account",
+          "to_account_id": "ACC-2001",
+          "amount_inr": 300000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1000",
+          "account_type": "account",
+          "to_account_id": "ACC-2002",
+          "amount_inr": 300000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1000",
+          "account_type": "account",
+          "to_account_id": "ACC-2003",
+          "amount_inr": 240000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1001",
+          "account_type": "victim",
+          "to_account_id": "ACC-1000",
+          "amount_inr": 250000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1002",
+          "account_type": "victim",
+          "to_account_id": "ACC-1000",
+          "amount_inr": 300000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1003",
+          "account_type": "victim",
+          "to_account_id": "ACC-1000",
+          "amount_inr": 150000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-1004",
+          "account_type": "victim",
+          "to_account_id": "ACC-1000",
+          "amount_inr": 140000.0
+        },
+        {
+          "complaint_id": "CF-1042",
+          "account_id": "ACC-2001",
+          "account_type": "account",
+          "to_account_id": "ACC-3001",
+          "amount_inr": 150000.0
+        }
+      ]
+    },
+    {
+      "title": "Rank predicted ATMs with supporting evidence",
+      "sql": "SELECT p.complaint_id, p.predicted_atm_id, p.confidence, pf.feature_name\nFROM Prediction p\nJOIN PredictionFeature pf ON pf.prediction_id = p.prediction_id\nORDER BY p.complaint_id, pf.rank_order\nLIMIT 8;",
+      "columns": [
+        "complaint_id",
+        "predicted_atm_id",
+        "confidence",
+        "feature_name"
+      ],
+      "rows": [
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "12 rapid transactions detected"
+        },
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "19 total transactions in case network"
+        },
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "4-level transaction chain depth"
+        },
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "High fan-out distribution (max 3 outgoing)"
+        },
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "Network convergence detected at consolidation nodes"
+        },
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "Activity across 2 geographic zones"
+        },
+        {
+          "complaint_id": "CF-1042",
+          "predicted_atm_id": "ATM-B05",
+          "confidence": 0.68,
+          "feature_name": "Low device consistency (0.22) \u2014 funds moved through multiple devices rather than one consistent device"
+        },
+        {
+          "complaint_id": "CF-2001",
+          "predicted_atm_id": "ATM-A04",
+          "confidence": 0.9,
+          "feature_name": "3 rapid transactions detected"
+        }
+      ]
+    },
+    {
+      "title": "Find accounts with withdrawal history near the predicted ATM's zone",
+      "sql": "SELECT wh.account_id, wh.atm_id, atm.zone_id, wh.amount_inr, wh.days_ago\nFROM WithdrawalHistory wh\nJOIN ATM atm ON atm.atm_id = wh.atm_id\nORDER BY wh.days_ago ASC\nLIMIT 8;",
+      "columns": [
+        "account_id",
+        "atm_id",
+        "zone_id",
+        "amount_inr",
+        "days_ago"
+      ],
+      "rows": [
+        {
+          "account_id": "ACC-3053",
+          "atm_id": "ATM-A04",
+          "zone_id": "zone_a",
+          "amount_inr": 20000.0,
+          "days_ago": 6
+        },
+        {
+          "account_id": "ACC-GATEWAY-99",
+          "atm_id": "ATM-C04",
+          "zone_id": "zone_c",
+          "amount_inr": 2000.0,
+          "days_ago": 8
+        },
+        {
+          "account_id": "ACC-4001",
+          "atm_id": "ATM-C02",
+          "zone_id": "zone_c",
+          "amount_inr": 2000.0,
+          "days_ago": 8
+        },
+        {
+          "account_id": "ACC-GATEWAY-99",
+          "atm_id": "ATM-C01",
+          "zone_id": "zone_c",
+          "amount_inr": 20000.0,
+          "days_ago": 13
+        },
+        {
+          "account_id": "ACC-1084",
+          "atm_id": "ATM-C04",
+          "zone_id": "zone_c",
+          "amount_inr": 8000.0,
+          "days_ago": 13
+        },
+        {
+          "account_id": "ACC-2050",
+          "atm_id": "ATM-A02",
+          "zone_id": "zone_a",
+          "amount_inr": 15000.0,
+          "days_ago": 15
+        },
+        {
+          "account_id": "ACC-3001",
+          "atm_id": "ATM-A05",
+          "zone_id": "zone_a",
+          "amount_inr": 20000.0,
+          "days_ago": 16
+        },
+        {
+          "account_id": "ACC-3054",
+          "atm_id": "ATM-A03",
+          "zone_id": "zone_a",
+          "amount_inr": 25000.0,
+          "days_ago": 19
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+backend/users.json
+backend/.env
+backend/.env.local
+frontend/.env.local
+frontend/dist
+node_modules
+**/node_modules
