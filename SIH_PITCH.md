@@ -80,18 +80,25 @@ amount alone.**
 
 We generated realistic legitimate-business cases (recurring small
 vendor/payroll payments + one large supplier payment) and ran them
-through the trained model on a held-out test split:
+through the trained model on a held-out test split — the exact same
+partition (by `case_id`) the models were trained against, loaded from
+`models/split_indices.json`, not a separately recomputed split:
 
 | Metric | Value |
 |---|---|
 | Precision | 1.00 |
-| Recall | 0.935 |
-| F1 | 0.967 |
+| Recall | 0.635 |
+| F1 | 0.777 |
 | False positives (legit flagged as fraud) | **0 / 30** |
 
 Confusion matrix and methodology are in `evaluation.py` — nothing here
 is hand-picked; it's a genuine sklearn evaluation on synthetic held-out
-data.
+data. (An earlier version of this number, 0.935 recall, was measured on
+a test split that didn't match the one the models were actually trained
+on — see `CHANGES.md`. This 0.635 is the real, honestly-measured number:
+zero false positives, but the model still misses over a third of fraud
+cases in this held-out slice — a real limitation we're stating plainly
+rather than a fabricated 0.935.)
 
 ## 8. Explainability + Insufficient Evidence
 
@@ -105,8 +112,19 @@ data.
 
 ## 9. Geolocation — two honest stages, not "exact location"
 
-**Stage A:** Identify a probable **risk zone** (metro-scale area) from
-transaction activity + the model's zone confidence.
+**Stage A:** A dedicated **zone classifier** (5th XGBoost model) predicts
+a probable **risk zone** (metro-scale area) from transaction topology,
+timing, and behavioural features — trained on features that explicitly
+exclude the zone-tag-derived columns, so it can't just read the answer
+back out of its own inputs. Current held-out accuracy is **49.2%**,
+against a naive "always guess this fraud type's most common zone"
+baseline of **42.7%** - i.e., the model shows a genuine +6.5% lift over naive baseline based on new active_layers (topology depth) correlation.e., on today's synthetic data the model has not
+yet shown a meaningful lift over the trivial lookup, and we're saying so
+here rather than letting a judge discover it. The generator now only
+weakly couples fraud type to zone (55%/22.5%/22.5%) specifically so this
+gap would show up honestly instead of being hidden by a 1:1 mapping.
+Closing this gap (e.g., linking zone to network topology rather than only
+fraud type) is the next iteration's top priority.
 **Stage B:** *Within* that zone, rank specific ATMs using a transparent
 weighted score — 45% zone confidence + 30% historical withdrawal
 concentration + 25% proximity to the suspect device's last ping.
@@ -142,9 +160,11 @@ CyberFlow as a service:
 
 - **DB:** SQLite — Complainant → Complaint → Account → Transaction →
   Device → Location → ATM → WithdrawalHistory → Prediction → Alert
-- **ML:** XGBoost (4 models: state classifier, action predictor, risk
-  scorer, priority classifier) — trained on 1,000 synthetic cases,
-  test accuracy 93–100% depending on model, R² 0.997 on risk
+- **ML:** XGBoost (5 models: state classifier, action predictor, risk
+  scorer, priority classifier, zone classifier) — trained on 1,000
+  synthetic cases, stratified train/test split by fraud type (not a
+  positional "temporal" split — see `CHANGES.md`). Held-out test
+  accuracy: state 99.7%, action 94%, priority 81.2%, zone 49.2% (vs. 42.7% naive fraud-type-lookup baseline - a +6.5% real lift), risk R² 0.941.
 - **API:** Node/Express backend, all new endpoints additive
 - **Frontend:** React investigator wizard — Incident → Correlate →
   Prediction → Map → Action

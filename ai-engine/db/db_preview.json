@@ -224,49 +224,49 @@
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "12 rapid transactions detected"
         },
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "19 total transactions in case network"
         },
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "4-level transaction chain depth"
         },
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "High fan-out distribution (max 3 outgoing)"
         },
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "Network convergence detected at consolidation nodes"
         },
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "Activity across 2 geographic zones"
         },
         {
           "complaint_id": "CF-1042",
           "predicted_atm_id": "ATM-B05",
-          "confidence": 0.68,
+          "confidence": 0.55,
           "feature_name": "Low device consistency (0.22) \u2014 funds moved through multiple devices rather than one consistent device"
         },
         {
           "complaint_id": "CF-2001",
           "predicted_atm_id": "ATM-A04",
-          "confidence": 0.9,
+          "confidence": 0.66,
           "feature_name": "3 rapid transactions detected"
         }
       ]

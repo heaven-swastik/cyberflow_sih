@@ -119,7 +119,7 @@ def _haversine_km(lat1, lng1, lat2, lng2):
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def _synthesize_complaint(case_id, fraud_type, exposure_inr, first_tx_time):
+def _synthesize_complaint(seed_key, fraud_type, exposure_inr, first_tx_time):
     """Build a plausible, clearly-synthetic NCRP-style complaint record."""
     rng = _seeded_rng("complaint", case_id)
     first_names = ["Sunita", "Rajesh", "Amit", "Priya", "Manoj", "Kavita", "Arjun", "Neha"]
@@ -150,7 +150,7 @@ def _synthesize_complaint(case_id, fraud_type, exposure_inr, first_tx_time):
     }
 
 
-def _synthesize_device(case_id, home_zone):
+def _synthesize_device(seed_key, home_zone):
     """A synthetic 'last known device ping' near the network's active zone."""
     rng = _seeded_rng("device", case_id)
     hub = ZONE_HUBS[home_zone]
@@ -271,7 +271,8 @@ def rank_atm_candidates(case_id, location_candidates, involved_accounts, withdra
     return candidates[:top_n]
 
 
-def enrich_case_with_atm_intelligence(case_id, case_obj, transactions, fraud_type):
+def enrich_case_with_atm_intelligence(case_id, case_obj, transactions, fraud_type, seed_override=None):
+    seed_key = seed_override or case_id
     """
     Main entry point called from pipeline.py after the classifier has
     produced its zone-level prediction. Adds ATM-level fields to case_obj:
@@ -313,10 +314,10 @@ def enrich_case_with_atm_intelligence(case_id, case_obj, transactions, fraud_typ
         top_zone = case_obj["location_candidates"][0]["zone_id"]
     top_zone = top_zone or (zones_touched[0] if zones_touched else "zone_a")
 
-    complaint = _synthesize_complaint(case_id, fraud_type, exposure, first_tx_time)
-    device = _synthesize_device(case_id, top_zone)
+    complaint = _synthesize_complaint(seed_key, fraud_type, exposure, first_tx_time)
+    device = _synthesize_device(seed_key, top_zone)
     withdrawal_history = _synthesize_withdrawal_history(
-        case_id, involved_accounts, zones_touched or [top_zone]
+        seed_key, involved_accounts, zones_touched or [top_zone]
     )
 
     evidence_status = case_obj.get("evidence_status", "sufficient")
@@ -329,7 +330,7 @@ def enrich_case_with_atm_intelligence(case_id, case_obj, transactions, fraud_typ
         )
     else:
         atm_candidates = rank_atm_candidates(
-            case_id, case_obj.get("location_candidates"), involved_accounts,
+            seed_key, case_obj.get("location_candidates"), involved_accounts,
             withdrawal_history, device
         )
         atm_ranking_status = "ranked"

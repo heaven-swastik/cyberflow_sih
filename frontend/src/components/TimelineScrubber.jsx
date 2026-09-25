@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getTimeline } from '../api';
 import { stateLabel, stateColor } from '../utils/format';
 
-export default function TimelineScrubber({ caseId, onStepChange, onStateChange, caseData, isOpen, onClose, autoPlay, inline = false }) {
+export default function TimelineScrubber({ caseId, onStepChange, onStateChange, caseData, isOpen, onClose, autoPlay, inline = false, refreshTrigger }) {
   const [timeline, setTimeline] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -13,10 +13,10 @@ export default function TimelineScrubber({ caseId, onStepChange, onStateChange, 
     if (!caseId) return;
     getTimeline(caseId).then((data) => {
       setTimeline(data);
-      setCurrentStep(0);
+      setCurrentStep(prev => prev > 0 ? data.length - 1 : 0);
       setIsPlaying(false);
     });
-  }, [caseId]);
+  }, [caseId, refreshTrigger]);
 
   const maxStep = timeline.length - 1;
   const isAtEnd = currentStep >= maxStep;

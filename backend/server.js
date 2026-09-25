@@ -112,16 +112,29 @@ function loadUsers() {
     users = [];
   }
 
-  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD && !users.some((user) => user.email === process.env.ADMIN_EMAIL.toLowerCase())) {
-    users.push({
-      id: crypto.randomUUID(),
-      email: process.env.ADMIN_EMAIL.toLowerCase(),
-      displayName: process.env.ADMIN_NAME || 'CyberFlow Administrator',
-      role: 'admin',
-      passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 12),
-      createdAt: new Date().toISOString(),
-    });
-    saveUsers();
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+    const adminEmail = process.env.ADMIN_EMAIL.toLowerCase();
+    const existingAdmin = users.find((user) => user.email === adminEmail);
+
+    if (existingAdmin) {
+      const isStalePassword = !bcrypt.compareSync(process.env.ADMIN_PASSWORD, existingAdmin.passwordHash);
+      if (existingAdmin.role !== 'admin' || isStalePassword) {
+        existingAdmin.role = 'admin';
+        existingAdmin.displayName = process.env.ADMIN_NAME || existingAdmin.displayName || 'CyberFlow Administrator';
+        existingAdmin.passwordHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 12);
+        saveUsers();
+      }
+    } else {
+      users.push({
+        id: crypto.randomUUID(),
+        email: adminEmail,
+        displayName: process.env.ADMIN_NAME || 'CyberFlow Administrator',
+        role: 'admin',
+        passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 12),
+        createdAt: new Date().toISOString(),
+      });
+      saveUsers();
+    }
   }
 }
 
@@ -309,6 +322,15 @@ app.get('/api/macro/heatmap', authenticateToken, requireRole('admin', 'officer')
   });
 });
 
+
+app.get('/api/model-proof', (req, res) => {
+  res.json({
+    model_proof: data.model_proof || {},
+    feature_analysis: data.feature_analysis || {},
+    evaluation_report: data.evaluation_report || {}
+  });
+});
+
 app.get('/api/cases', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   res.json(data.cases || []);
 });
@@ -378,12 +400,54 @@ function runBlockchainCli(action, ...args) {
   }
 }
 
+
+// RL Correction Layer: Simulate verified evidence
+app.post('/api/cases/:case_id/verify-evidence', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
+  const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
+  if (!c) return res.status(404).json({ error: 'case not found' });
+
+  const verifiedNextState = req.body.verified_state;
+  if (!verifiedNextState) return res.status(400).json({ error: 'verified_state is required' });
+
+  try {
+    const { execSync } = require('child_process');
+    const scriptPath = '../ai-engine/rl_correction_engine.py';
+    const result = execSync(`python ${scriptPath} ${req.params.case_id} ${verifiedNextState} ./case_export.json`).toString();
+    
+    // Reload data after correction
+    const rawData = fs.readFileSync('./case_export.json');
+    data = JSON.parse(rawData);
+    const updatedCase = data.cases.find(x => x.case_id === req.params.case_id);
+
+    // Rebuild SQLite DB
+    execSync('python ../ai-engine/db/build_db.py');
+    execSync('cp ../ai-engine/db/cyberflow.db ./db/cyberflow.db || copy ..\\ai-engine\\db\\cyberflow.db .\\db\\cyberflow.db');
+
+    res.json(updatedCase);
+  } catch (error) {
+    console.error('RL Correction Error:', error);
+    res.status(500).json({ error: 'Failed to process RL correction' });
+  }
+});
+
 app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
   if (!c) return res.status(404).json({ error: "case not found" });
 
   if (!data.alerts) data.alerts = [];
   const alerts = data.alerts;
+
+  // Re-alert guard
+  const existingAlert = alerts.find(a => a.case_id === req.params.case_id && a.status !== 'failed');
+  if (existingAlert && req.body.force_retry !== true) {
+    return res.status(400).json({ error: "Active alert already exists for this case" });
+  }
+
+  // Simulated failure/retry
+  if (req.body.simulate_failure === true) {
+     return res.status(503).json({ error: "Simulated gateway timeout / SMS failure", status: 'failed' });
+  }
+
   const alert_id = `ALT-${String(alerts.length + 1).padStart(4, '0')}`;
   
   const prev_hash = alerts.length > 0 ? alerts[alerts.length - 1].hash : "0".repeat(64);
@@ -450,6 +514,16 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
   const bcResult = runBlockchainCli('add', 'alert_dispatched', c.case_id, JSON.stringify(alertFields));
   if (bcResult && bcResult.hash) {
     newAlert.blockchain_tx = bcResult.hash;
+  }
+
+  // Persistence
+  try {
+    fs.writeFileSync('./case_export.json', JSON.stringify(data, null, 2));
+    const { execSync } = require('child_process');
+    execSync('python ../ai-engine/db/build_db.py');
+    execSync('cp ../ai-engine/db/cyberflow.db ./db/cyberflow.db || copy ..\\ai-engine\\db\\cyberflow.db .\\db\\cyberflow.db');
+  } catch(e) {
+    console.error('Failed to persist alert', e);
   }
 
   res.json(newAlert);
@@ -523,9 +597,34 @@ app.get('/api/db/preview', authenticateToken, requireRole('admin'), (req, res) =
 
 // ── Live Feed endpoint ──
 app.get('/api/feed', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
-  const count = Math.min(parseInt(req.query.count) || 5, 20);
-  const events = Array.from({ length: count }, () => generateFeedEvent());
-  res.json(events);
+  // Derive events from real data
+  let events = [];
+  
+  if (data.cases) {
+    data.cases.forEach(c => {
+      events.push({
+        id: 'CASE-' + c.case_id,
+        timestamp: c.filed_at || new Date().toISOString(),
+        severity: c.intervention_priority === 'HIGH' ? 'critical' : (c.intervention_priority === 'MEDIUM' ? 'warning' : 'info'),
+        message: `Case ${c.case_id} (${c.complainant_name || 'unknown complainant'}) created with ${c.intervention_priority || 'unknown'} priority.`
+      });
+    });
+  }
+  
+  if (data.alerts) {
+    data.alerts.forEach(a => {
+      events.push({
+        id: 'ALERT-' + a.alert_id,
+        timestamp: a.sent_at || new Date().toISOString(),
+        severity: 'critical',
+        message: `Alert ${a.alert_id} dispatched to ${a.channel || 'unknown channel'} for Case ${a.case_id || 'unknown case'}.`
+      });
+    });
+  }
+  
+  events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const count = Math.min(parseInt(req.query.count) || 10, 50);
+  res.json(events.slice(0, count));
 });
 
 // ── Feature Analysis + Evaluation endpoints (requirement 4 & 6) ──
@@ -614,6 +713,10 @@ app.post('/api/complaints',
   body('complainant_name').isString().trim().escape().notEmpty().withMessage('Name is required'),
   body('fraud_type').isIn(['investment_scam', 'digital_arrest', 'fake_payment_gateway', 'legitimate_business']).escape().withMessage('Invalid fraud type'),
   body('amount_inr').isNumeric().withMessage('Amount must be a number'),
+  body('time_since_incident').optional({ nullable: true, checkFalsy: true })
+    .isIn(['under_1_hour', 'few_hours', '1_2_days', 'longer']).withMessage('Invalid time_since_incident'),
+  body('num_transfers_recalled').optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 0 }).withMessage('num_transfers_recalled must be a non-negative integer'),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -666,6 +769,23 @@ app.post('/api/complaints',
   if (parsed.alert) {
     data.alerts = data.alerts || [];
     data.alerts.push(parsed.alert);
+  }
+  
+  // Persist to JSON
+  try {
+    fs.writeFileSync('./case_export.json', JSON.stringify(data, null, 2));
+  } catch(e) {
+    console.error('Failed to save to case_export.json', e);
+  }
+  
+  // Also rebuild SQLite DB so live complaints are queryable there
+  try {
+    const { execSync } = require('child_process');
+    execSync('python ../ai-engine/db/build_db.py');
+    // Copy the updated DB to backend
+    execSync('cp ../ai-engine/db/cyberflow.db ./db/cyberflow.db || copy ..\\ai-engine\\db\\cyberflow.db .\\db\\cyberflow.db');
+  } catch(e) {
+    console.error('Failed to rebuild SQLite db', e);
   }
 
   res.json(parsed);

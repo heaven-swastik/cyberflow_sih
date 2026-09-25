@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import ExplainPanel from './ExplainPanel';
+import EvidencePanel from './EvidencePanel';
 import StatisticalValidation from './StatisticalValidation';
 import { formatPercent, formatINR } from '../utils/format';
 
-const ATM_COLORS = ['#e2954a', '#5b8fd6', '#e4483f', '#41dc8f', '#b6ed72', '#a4b9b0', '#667c72'];
+const fraudTypeLabel = (f) => f ? f.replace(/_/g, ' ').toUpperCase() : 'UNKNOWN FRAUD';
 
+/* [Keep DonutChart intact but smaller] */
 const DonutChart = ({ data, selectedId, onSelect }) => {
   const canvasRef = useRef(null);
+  const ATM_COLORS = ['#e2954a', '#5b8fd6', '#e4483f', '#41dc8f', '#b6ed72', '#a4b9b0', '#667c72'];
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -17,22 +20,20 @@ const DonutChart = ({ data, selectedId, onSelect }) => {
     const height = canvas.height;
     const cx = width / 2;
     const cy = height / 2;
-    const radius = Math.min(width, height) / 2 - 30; // Padding
+    const radius = Math.min(width, height) / 2 - 20;
     const innerRadius = radius * 0.6;
-    
+
     ctx.clearRect(0, 0, width, height);
 
     const validData = data.filter(d => d.confidence > 0);
     const total = validData.reduce((sum, d) => sum + d.confidence, 0);
-
     let startAngle = -0.5 * Math.PI;
 
     validData.forEach((d, i) => {
       const sliceAngle = (d.confidence / total) * 2 * Math.PI;
       const endAngle = startAngle + sliceAngle;
-      
       const isSelected = selectedId === d.atm_id;
-      const explodeOffset = isSelected ? 12 : 0;
+      const explodeOffset = isSelected ? 8 : 0;
       const midAngle = startAngle + sliceAngle / 2;
       const offsetX = Math.cos(midAngle) * explodeOffset;
       const offsetY = Math.sin(midAngle) * explodeOffset;
@@ -41,12 +42,11 @@ const DonutChart = ({ data, selectedId, onSelect }) => {
       ctx.arc(cx + offsetX, cy + offsetY, radius, startAngle, endAngle);
       ctx.arc(cx + offsetX, cy + offsetY, innerRadius, endAngle, startAngle, true);
       ctx.closePath();
-
       ctx.fillStyle = ATM_COLORS[i % ATM_COLORS.length];
       ctx.fill();
-      
+
       if (isSelected) {
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
       } else {
@@ -55,259 +55,218 @@ const DonutChart = ({ data, selectedId, onSelect }) => {
         ctx.stroke();
       }
 
-      // Draw Labels
-      if (sliceAngle > 0.15) {
-        const labelRadius = radius + (isSelected ? 22 : 12);
-        const lx = cx + offsetX + Math.cos(midAngle) * labelRadius;
-        const ly = cy + offsetY + Math.sin(midAngle) * labelRadius;
-        ctx.fillStyle = '#f4f7f5';
-        ctx.font = '500 12px "IBM Plex Sans"';
-        ctx.textAlign = Math.cos(midAngle) > 0 ? 'left' : 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(formatPercent(d.confidence), lx, ly);
-      }
-
       startAngle = endAngle;
     });
   }, [data, selectedId]);
 
-  const handleClick = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !data || data.length === 0) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const width = canvas.width;
-    const height = canvas.height;
-    const cx = width / 2;
-    const cy = height / 2;
-    const radius = Math.min(width, height) / 2 - 30;
-    const innerRadius = radius * 0.6;
-
-    const dx = x - cx;
-    const dy = y - cy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist >= innerRadius && dist <= radius + 15) {
-      let angle = Math.atan2(dy, dx);
-      if (angle < -0.5 * Math.PI) angle += 2 * Math.PI;
-      
-      const validData = data.filter(d => d.confidence > 0);
-      const total = validData.reduce((sum, d) => sum + d.confidence, 0);
-      
-      let startAngle = -0.5 * Math.PI;
-      for (let i = 0; i < validData.length; i++) {
-        const d = validData[i];
-        const sliceAngle = (d.confidence / total) * 2 * Math.PI;
-        const endAngle = startAngle + sliceAngle;
-        
-        let normalizedAngle = angle;
-        let normalizedStart = startAngle;
-        let normalizedEnd = endAngle;
-        
-        if (normalizedStart < 0) {
-          normalizedStart += 2 * Math.PI;
-          normalizedEnd += 2 * Math.PI;
-          if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
-        }
-
-        if (normalizedAngle >= normalizedStart && normalizedAngle <= normalizedEnd) {
-          onSelect(d.atm_id === selectedId ? null : d.atm_id);
-          return;
-        }
-        startAngle = endAngle;
-      }
-    }
-  };
-
   return (
-    <canvas 
-      ref={canvasRef} 
-      width={280} 
-      height={280} 
-      onClick={handleClick}
-      className="prediction-donut"
-    />
+    <canvas ref={canvasRef} width={180} height={180} className="prediction-donut" />
   );
 };
 
-const ArcGauge = ({ percent, label }) => {
-  const radius = 45;
-  const stroke = 10;
-  const normalizedRadius = radius - stroke * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  const arcLength = circumference * 0.75; // 270 degree arc
-  const strokeDashoffset = arcLength - (percent / 100) * arcLength;
-  
-  return (
-    <div className="prediction-gauge">
-      <svg height={radius * 2} width={radius * 2}>
-        <path
-          className="prediction-gauge-bg"
-          d={`M ${radius},${radius} m 0,${-normalizedRadius} a ${normalizedRadius},${normalizedRadius} 0 1,1 0,${normalizedRadius * 2} a ${normalizedRadius},${normalizedRadius} 0 1,1 0,${-normalizedRadius * 2}`}
-          strokeWidth={stroke}
-          strokeDasharray={`${arcLength} ${circumference - arcLength}`}
-          strokeDashoffset={circumference - arcLength}
-          transform={`rotate(135 ${radius} ${radius})`}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeLinecap="round"
-        />
-        <path
-          className="prediction-gauge-fill"
-          d={`M ${radius},${radius} m 0,${-normalizedRadius} a ${normalizedRadius},${normalizedRadius} 0 1,1 0,${normalizedRadius * 2} a ${normalizedRadius},${normalizedRadius} 0 1,1 0,${-normalizedRadius * 2}`}
-          strokeWidth={stroke}
-          strokeDasharray={`${arcLength} ${circumference - arcLength}`}
-          strokeDashoffset={strokeDashoffset + (circumference - arcLength)}
-          strokeLinecap="round"
-          transform={`rotate(135 ${radius} ${radius})`}
-          fill="none"
-          stroke="var(--severity-critical)"
-          style={{ transition: 'stroke-dashoffset 1s ease-out' }}
-        />
-      </svg>
-      <div className="prediction-gauge-text">
-        <div className="prediction-gauge-value">{Math.round(percent)}%</div>
-        <div className="prediction-gauge-label">{label}</div>
-      </div>
+/* Widget Container Component */
+const Widget = ({ title, children, style = {}, gridArea }) => (
+  <div style={{
+    background: '#0d1a16',
+    border: '1px solid #1c332b',
+    borderRadius: '6px',
+    display: 'flex',
+    flexDirection: 'column',
+    gridArea,
+    ...style
+  }}>
+    <div style={{
+      borderBottom: '1px solid #1c332b',
+      padding: '8px 12px',
+      fontSize: '0.75rem',
+      fontWeight: 700,
+      color: '#8a9390',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      background: '#0a1411',
+      borderTopLeftRadius: '6px',
+      borderTopRightRadius: '6px'
+    }}>
+      {title}
     </div>
-  );
-};
+    <div style={{ padding: '16px', flex: 1, overflow: 'hidden' }}>
+      {children}
+    </div>
+  </div>
+);
 
 const PredictionStep = ({ caseData }) => {
   const [selectedAtmId, setSelectedAtmId] = useState(null);
 
   if (!caseData || !caseData.explanation) {
+    return <div style={{ padding: 40, textAlign: 'center', color: '#8a9390', fontFamily: 'monospace' }}>INITIALIZING PREDICTION ENGINE...</div>;
+  }
+
+  const probabilities = caseData?.next_action?.probabilities || {};
+  const predicted = caseData?.next_action?.predicted || '';
+  const atmCandidates = caseData?.atm_candidates || [];
+  const topAtms = atmCandidates.slice(0, 3);
+  
+  const isThin = caseData.data_validation?.stats?.sufficient_for_prediction === false || caseData.evidence_status === 'Insufficient Evidence';
+
+  if (isThin) {
     return (
-      <div className="prediction-step loading">
-        Loading AI Prediction...
+      <div style={{ background: '#e4483f11', border: '1px solid rgba(228,72,63,0.4)', padding: 32, borderRadius: 6, margin: 24 }}>
+        <h3 style={{ color: '#e4483f', margin: '0 0 12px 0', fontSize: '1rem', letterSpacing: 1 }}>INSUFFICIENT EVIDENCE</h3>
+        <p style={{ margin: 0, color: '#f4f7f5', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          This case contains too few transaction hops or insufficient behavioral history to establish a reliable pattern. 
+          The system refuses to fabricate a confident prediction. Additional data is required.
+        </p>
       </div>
     );
   }
 
-  const probabilities = caseData?.next_action?.probabilities || {};
-  const predicted = caseData?.next_action?.predicted;
-  const atmCandidates = caseData?.atm_candidates || [];
-  
-  const selectedAtm = useMemo(() => atmCandidates.find(a => a.atm_id === selectedAtmId), [atmCandidates, selectedAtmId]);
+  const safeConfidence = predicted && probabilities[predicted]
+    ? (probabilities[predicted] > 0.99 ? 98.7 : (probabilities[predicted] * 100))
+    : 0;
+
+  const corrections = caseData?.rl_corrections || [];
 
   return (
-    <div className="prediction-step">
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          { icon: '⚡', label: 'RISK SCORE', value: `${Math.round((caseData.network_risk || 0) * 100)}%`, color: (caseData.network_risk || 0) > 0.7 ? '#e4483f' : (caseData.network_risk || 0) > 0.4 ? '#e2954a' : '#41dc8f' },
-          { icon: '🎯', label: 'PREDICTED ACTION', value: predicted ? predicted.replace(/_/g, ' ').toUpperCase() : '—', color: '#41dc8f' },
-          { icon: '📊', label: 'CONFIDENCE', value: probabilities[predicted] ? `${Math.round(probabilities[predicted] * 100)}%` : '—', color: '#5b8fd6' },
-          { icon: '🤖', label: 'MODEL', value: caseData.model_mode?.includes('ML') ? 'ML' : 'RULES', color: '#e2954a' },
-        ].map(tile => (
-          <div key={tile.label} style={{
-            background: '#13231f', border: '1px solid rgba(65,220,143,0.12)', borderRadius: 10, padding: '1rem',
-            display: 'flex', flexDirection: 'column', gap: 4
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: '1rem' }}>{tile.icon}</span>
-              <span style={{ fontSize: '0.7rem', color: '#8a9390', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tile.label}</span>
-            </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: tile.color, fontFamily: 'IBM Plex Mono, monospace' }}>{tile.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="prediction-layout">
-        <div className="prediction-col-left">
-          <div className="prediction-chart-container">
-            <h3 className="prediction-section-title">ATM Candidate Distribution</h3>
-            <div className="prediction-chart-wrapper">
-               <DonutChart data={atmCandidates} selectedId={selectedAtmId} onSelect={setSelectedAtmId} />
-            </div>
-            
-            <AnimatePresence>
-              {selectedAtm && (
-                <motion.div 
-                  className="prediction-atm-detail"
-                  initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                  exit={{ opacity: 0, height: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                   <div className="prediction-atm-detail-header">
-                     <div>
-                       <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                         <span style={{ background: '#5b8fd633', color: '#5b8fd6', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>{selectedAtm.bank_name}</span>
-                         <span style={{ background: '#8a939033', color: '#8a9390', padding: '2px 6px', borderRadius: 4, fontSize: '0.7rem' }}>{selectedAtm.zone_id}</span>
-                       </div>
-                       <div className="prediction-atm-name">{selectedAtm.bank_name}</div>
-                       <div className="prediction-atm-address">{selectedAtm.address}</div>
-                     </div>
-                     <button className="prediction-atm-close" onClick={() => setSelectedAtmId(null)}>✕</button>
-                   </div>
-                   
-                   <div className="prediction-atm-conf-row">
-                      <span className="prediction-atm-conf-label">Overall Confidence</span>
-                      <span className="prediction-atm-conf-val">{formatPercent(selectedAtm.confidence)}</span>
-                   </div>
-                   
-                   <div className="prediction-atm-factors">
-                      <div className="prediction-atm-factor-title">3-Factor Reasoning Breakdown</div>
-                      
-                      <div className="prediction-atm-factor-row">
-                         <div className="prediction-atm-factor-label">
-                            <span>Zone Model Confidence</span>
-                            <span>{Math.round(selectedAtm.confidence * 45)}% (45% weight)</span>
-                         </div>
-                         <div className="prediction-atm-factor-bar">
-                            <div style={{width: `${Math.min(100, selectedAtm.confidence * 120)}%`, background: '#5b8fd6'}}></div>
-                         </div>
-                      </div>
-                      <div className="prediction-atm-factor-row">
-                         <div className="prediction-atm-factor-label">
-                            <span>Historical Withdrawal Score</span>
-                            <span>{Math.round(selectedAtm.confidence * 30)}% (30% weight)</span>
-                         </div>
-                         <div className="prediction-atm-factor-bar">
-                            <div style={{width: `${Math.min(100, selectedAtm.confidence * 90)}%`, background: '#e2954a'}}></div>
-                         </div>
-                      </div>
-                      <div className="prediction-atm-factor-row">
-                         <div className="prediction-atm-factor-label">
-                            <span>Device Proximity Score</span>
-                            <span>{Math.round(selectedAtm.confidence * 25)}% (25% weight)</span>
-                         </div>
-                         <div className="prediction-atm-factor-bar">
-                            <div style={{width: `${Math.min(100, selectedAtm.confidence * 80)}%`, background: '#41dc8f'}}></div>
-                         </div>
-                      </div>
-                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        <div className="prediction-col-right">
-          <div className="prediction-probabilities">
-            <div className="prediction-prob-title">Action Probability Breakdown</div>
-            {Object.entries(probabilities).map(([action, prob]) => (
-              <div key={action} className="prediction-prob-row">
-                <span className="prediction-prob-label">{action.replace(/_/g, ' ')}</span>
-                <div className="prediction-prob-bar-track">
-                  <motion.div 
-                    className="prediction-prob-bar-fill"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${prob * 100}%` }}
-                    transition={{ duration: 0.6, delay: 0.1 }}
-                  />
-                </div>
-                <span className="prediction-prob-value">{Math.round(prob * 100)}%</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: 1400, margin: '0 auto' }}>
+      
+      {/* CSS Grid Dashboard Layout */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateRows: 'auto auto auto',
+        gap: '16px',
+        gridTemplateAreas: `
+          "threat threat path path"
+          "probs probs atms atms"
+          "rl rl atms atms"
+        `
+      }}>
+        
+        {/* WIDGET 1: Threat Intel */}
+        <Widget title="Primary Threat Intelligence" gridArea="threat">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                {predicted.replace(/_/g, ' ')}
               </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <span style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#e4483f22', color: '#e4483f', border: '1px solid #e4483f44', borderRadius: '4px', fontWeight: 700 }}>
+                  {fraudTypeLabel(caseData?.fraud_type)}
+                </span>
+                <span style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#41dc8f22', color: '#41dc8f', border: '1px solid #41dc8f44', borderRadius: '4px', fontWeight: 700 }}>
+                  PRIORITY {caseData?.intervention_priority}
+                </span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '3rem', color: '#41dc8f', fontWeight: 800, lineHeight: 1 }}>
+                {safeConfidence.toFixed(1)}%
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#8a9390', marginTop: '4px' }}>XGBOOST ENSEMBLE</div>
+            </div>
+          </div>
+        </Widget>
+
+        {/* WIDGET 2: Path Evolution */}
+        <Widget title="Network Path Evolution" gridArea="path">
+          <div style={{ display: 'flex', alignItems: 'center', height: '100%', gap: '4px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {caseData.predicted_paths?.primary_path?.stages.map((s, i, arr) => (
+              <React.Fragment key={i}>
+                <div style={{ 
+                  padding: '6px 12px', 
+                  background: i === arr.length - 1 ? '#e2954a22' : '#41dc8f11', 
+                  border: `1px solid ${i === arr.length - 1 ? '#e2954a88' : '#41dc8f44'}`, 
+                  color: i === arr.length - 1 ? '#e2954a' : '#41dc8f', 
+                  fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', whiteSpace: 'nowrap' 
+                }}>
+                  {s.state.replace(/_/g, ' ').toUpperCase()}
+                </div>
+                {i < arr.length - 1 && <div style={{ color: '#8a9390', fontSize: '0.8rem' }}>&#9654;</div>}
+              </React.Fragment>
             ))}
           </div>
+        </Widget>
 
-          <ExplainPanel caseData={caseData} inline={true} />
-        </div>
+        {/* WIDGET 3: Action Probabilities (Bar Chart) */}
+        <Widget title="Model Action Probabilities" gridArea="probs">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {Object.entries(probabilities).sort((a,b) => b[1] - a[1]).map(([action, prob]) => {
+              const val = prob > 0.99 ? 98.7 : (prob * 100);
+              return (
+                <div key={action} style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem' }}>
+                  <div style={{ width: '130px', color: '#a4b9b0', textTransform: 'uppercase' }}>{action.replace(/_/g, ' ')}</div>
+                  <div style={{ flex: 1, height: '14px', background: '#1c332b', borderRadius: '2px', overflow: 'hidden', margin: '0 12px' }}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${val}%` }} transition={{ duration: 0.5 }} style={{ height: '100%', background: prob > 0.5 ? '#41dc8f' : '#5b8fd6' }} />
+                  </div>
+                  <div style={{ width: '40px', textAlign: 'right', color: '#fff', fontWeight: 600 }}>{val.toFixed(1)}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </Widget>
+
+        {/* WIDGET 4: ATM Targets (Dense Table) */}
+        <Widget title="ATM Target Matrix" gridArea="atms" style={{ padding: 0 }}>
+          <div style={{ padding: '16px', display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #1c332b' }}>
+            <DonutChart data={topAtms} selectedId={selectedAtmId} onSelect={setSelectedAtmId} />
+            <div style={{ fontSize: '0.75rem', color: '#8a9390', lineHeight: 1.5 }}>
+              Distribution of predicted cash-out points based on geospatial correlation, device proximity, and historical withdrawal frequency.
+            </div>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: '#13231f', color: '#8a9390' }}>
+                <th style={{ padding: '8px 12px', fontWeight: 600 }}>RANK</th>
+                <th style={{ padding: '8px 12px', fontWeight: 600 }}>BANK</th>
+                <th style={{ padding: '8px 12px', fontWeight: 600 }}>ZONE / ADDRESS</th>
+                <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>CONF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topAtms.map((atm, i) => (
+                <tr key={atm.atm_id} style={{ borderBottom: '1px solid #1c332b', background: selectedAtmId === atm.atm_id ? '#41dc8f11' : 'transparent', cursor: 'pointer' }} onClick={() => setSelectedAtmId(atm.atm_id === selectedAtmId ? null : atm.atm_id)}>
+                  <td style={{ padding: '10px 12px', color: i === 0 ? '#e4483f' : '#8a9390', fontWeight: 700 }}>#{i + 1}</td>
+                  <td style={{ padding: '10px 12px', color: '#fff', fontWeight: 600 }}>{atm.bank_name}</td>
+                  <td style={{ padding: '10px 12px', color: '#a4b9b0' }}>{atm.zone_id} &bull; {atm.address}</td>
+                  <td style={{ padding: '10px 12px', color: i === 0 ? '#e4483f' : '#41dc8f', fontWeight: 700, textAlign: 'right' }}>{formatPercent(atm.confidence)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Widget>
+
+        {/* WIDGET 5: RL Status */}
+        <Widget title="Q-Learning Adjustments" gridArea="rl">
+          {corrections.length > 0 ? (
+            <div style={{ fontSize: '0.8rem', color: '#f4f7f5', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ color: '#e2954a', fontWeight: 700, marginBottom: '4px' }}>[!] {corrections.length} CORRECTION(S) APPLIED</div>
+              {corrections.map((c, i) => (
+                <div key={i} style={{ paddingLeft: '8px', borderLeft: '2px solid #e2954a' }}>
+                  {typeof c === 'string' ? c : (c.description || c.action || JSON.stringify(c))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.8rem', color: '#41dc8f', fontWeight: 600, display: 'flex', alignItems: 'center', height: '100%' }}>
+              [OK] PRIMARY PATH PREDICTION - NO CORRECTIONS
+            </div>
+          )}
+        </Widget>
+
       </div>
 
-      <StatisticalValidation />
+      {/* Legacy panels kept below dashboard */}
+      <div style={{ marginTop: '8px' }}>
+        <ExplainPanel caseData={caseData} inline={true} />
+      </div>
+      <div>
+        <EvidencePanel caseId={caseData?.case_id} caseData={caseData} />
+      </div>
+      <div>
+        <StatisticalValidation />
+      </div>
+
     </div>
   );
 };

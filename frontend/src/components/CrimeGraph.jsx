@@ -48,7 +48,7 @@ function lighten(hex, amt) {
   return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }
 
-export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState }) {
+export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState, refreshTrigger }) {
   const [graphData, setGraphData] = useState(null);
   const containerRef = useRef(null);
   const fgRef = useRef();
@@ -79,7 +79,7 @@ export default function CrimeGraph({ caseId, timelineStep, maxStep, currentState
     setInvalidatedNodes(new Set());
     nodeFirstSeenRef.current = {};
     getGraph(caseId).then(setGraphData);
-  }, [caseId]);
+  }, [caseId, refreshTrigger]);
 
   useEffect(() => {
     const el = containerRef.current;

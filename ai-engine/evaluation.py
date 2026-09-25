@@ -4,9 +4,17 @@ CyberFlow — Legitimate-Business Evaluation Stage (requirement 6).
 Trains models see BOTH fraud cases and legitimate-business cases (see
 generate_training_data.py: legit_fraction). This script evaluates how
 well the trained pipeline tells them apart on a held-out test split,
-using the SAME train/test split logic as train_models.py (same seed),
-so the reported numbers are genuine test-set metrics, not re-scored
+loading the EXACT same train/test partition train_models.py used (from
+models/split_indices.json) so the reported numbers are genuine test-set
+metrics on rows the models never saw during training, not re-scored
 training data.
+
+FIX (judge inspection §2.2): this file used to recompute its own random
+stratified split with the same seed/test_size as train_models.py, but a
+different algorithm (train_models.py used a plain positional split at
+the time) — so "same split logic" was false, and most of this file's
+"held-out" test rows were actually inside the model's training set. It
+now loads the literal case_id partition train_models.py wrote out.
 
 A case is treated as "predicted fraud" if the trained priority
 classifier assigns it MEDIUM or HIGH priority (i.e. the system would
@@ -64,15 +72,7 @@ def run_evaluation(data_dir=None, models_dir=None):
     X = df[FEATURE_COLS].replace([np.inf, -np.inf], np.nan).fillna(0)
     y_fraud = df["is_fraud"].values
 
-    # Same split as train_models.py (test_size=0.2, random_state=42,
-    # stratified) — but stratified on is_fraud here so both classes are
-    # represented in the held-out test set.
-    train_idx, test_idx = train_test_split(
-        np.arange(len(X)), test_size=0.2, random_state=42, stratify=y_fraud
-    )
-    X_test = X.iloc[test_idx]
-    y_test = y_fraud[test_idx]
-
+    split_path = os.path.join(models_dir, "split_indices.json")
     risk_model_path = os.path.join(models_dir, "risk_scorer.json")
     priority_model_path = os.path.join(models_dir, "priority_classifier.json")
 
@@ -82,6 +82,27 @@ def run_evaluation(data_dir=None, models_dir=None):
             "message": "Trained models not found — run train_models.py before evaluation. "
                        "No metrics are reported in this state (nothing is fabricated).",
         }
+    if not os.path.exists(split_path):
+        return {
+            "status": "SPLIT_NOT_FOUND",
+            "message": "models/split_indices.json not found — re-run train_models.py (it now "
+                       "writes this file) so evaluation.py can reuse the exact same held-out "
+                       "rows the models were tested on, instead of recomputing a different split.",
+        }
+
+    with open(split_path) as f:
+        split_record = json.load(f)
+    test_case_ids = set(split_record["test_case_ids"])
+    test_mask = df["case_id"].isin(test_case_ids).values
+    if test_mask.sum() == 0:
+        raise RuntimeError(
+            "None of split_indices.json's test_case_ids matched training_features.csv — "
+            "the feature file and the split were generated from different runs. Re-run "
+            "train_models.py (which regenerates both together) before evaluating."
+        )
+
+    X_test = X[test_mask]
+    y_test = y_fraud[test_mask]
 
     risk_model = xgb.XGBRegressor()
     risk_model.load_model(risk_model_path)
@@ -108,10 +129,11 @@ def run_evaluation(data_dir=None, models_dir=None):
 
     result = {
         "status": "OK",
-        "method": "Held-out test split (test_size=0.2, stratified, random_state=42 — "
-                  "same split logic as train_models.py). Predicted-fraud rule: "
-                  "priority != LOW OR risk >= {:.2f} (matches classifier.py "
-                  "FRAUD_DECISION_THRESHOLD).".format(FRAUD_DECISION_THRESHOLD),
+        "method": "Held-out test rows loaded from models/split_indices.json — the literal "
+                  "case_id partition train_models.py used (stratified by fraud_type, "
+                  "test_size=0.2, random_state=42), not a separately recomputed split. "
+                  "Predicted-fraud rule: priority != LOW OR risk >= {:.2f} (matches "
+                  "classifier.py FRAUD_DECISION_THRESHOLD).".format(FRAUD_DECISION_THRESHOLD),
         "n_test_cases": int(len(y_test)),
         "n_fraud_in_test": int(y_test.sum()),
         "n_legitimate_in_test": int(len(y_test) - y_test.sum()),

@@ -69,16 +69,7 @@ export default function ComplainantDashboard({ onFileComplaint }) {
                   <div className="complainant-case-card-top">
                     <div className="complainant-case-id-row">
                       <span className="complainant-case-id">{c.case_id}</span>
-                      <span
-                        className="complainant-priority-pill"
-                        style={{
-                          background: `${priorityColor(c.intervention_priority)}22`,
-                          color: priorityColor(c.intervention_priority),
-                          border: `1px solid ${priorityColor(c.intervention_priority)}44`,
-                        }}
-                      >
-                        {c.intervention_priority || 'LOW'}
-                      </span>
+                      
                     </div>
                     <span className="complainant-case-stage">{statusLabel(c)}</span>
                   </div>
@@ -88,15 +79,7 @@ export default function ComplainantDashboard({ onFileComplaint }) {
                       <div className="complainant-case-metric-label">Fraud Type</div>
                       <div className="complainant-case-metric-value">{(c.fraud_type || 'Unknown').replace(/_/g, ' ')}</div>
                     </div>
-                    <div className="complainant-case-metric">
-                      <div className="complainant-case-metric-label">Network Risk</div>
-                      <div
-                        className="complainant-case-metric-value"
-                        style={{ color: c.network_risk > 0.7 ? '#e4483f' : c.network_risk > 0.4 ? '#e2954a' : '#41dc8f', fontWeight: 700 }}
-                      >
-                        {c.network_risk != null ? `${Math.round(c.network_risk * 100)}%` : 'N/A'}
-                      </div>
-                    </div>
+                    
                     <div className="complainant-case-metric">
                       <div className="complainant-case-metric-label">Exposure</div>
                       <div className="complainant-case-metric-value">

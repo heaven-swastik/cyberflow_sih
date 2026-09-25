@@ -22,7 +22,11 @@ def main():
     checks = {
         "xgboost import available": engine.using_ml,
         "export mode is ML (XGBoost)": proof.get("inference_mode") == "ML (XGBoost)",
-        "four model fingerprints recorded": len(proof.get("model_files", {})) == 4,
+        # FIX (judge inspection, general constraint): updated from 4 to 5 —
+        # a genuinely trained zone_classifier was added (see FIX 6). This
+        # asserts on the new, honest model count rather than being silently
+        # deleted.
+        "five model fingerprints recorded": len(proof.get("model_files", {})) == 5,
         "42 engineered features recorded": proof.get("feature_count") == 42,
     }
 

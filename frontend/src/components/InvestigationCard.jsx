@@ -47,7 +47,10 @@ export default function InvestigationCard({ caseItem: c, index, onSelect }) {
       layoutId={`case-card-${c.case_id}`}
     >
       <div className="inv-card-header">
-        <div className="inv-case-id">{c.case_id}</div>
+        <div className="inv-case-id" style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+          {c.case_id}
+          {c.case_id === 'CF-1042' && <span style={{fontSize: '0.65rem', background: '#e4483f22', color: '#e4483f', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e4483f55'}}>RL DEMO</span>}
+        </div>
       </div>
       <div className="inv-fraud-type">{fraudTypeLabel(c.fraud_type)}</div>
 

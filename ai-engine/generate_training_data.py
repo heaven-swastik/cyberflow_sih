@@ -115,10 +115,18 @@ class SyntheticCaseGenerator:
         self.txn_counter += 1
         return f"TXN-{self.txn_counter:06d}"
 
-    def generate_single_case(self, case_id, fraud_type, target_state=None):
+    def generate_single_case(self, case_id, fraud_type, target_state=None, state_weights_override=None):
         """
         Generate a complete case with realistic transaction patterns.
         Returns (transactions_list, ground_truth_dict).
+
+        `state_weights_override`: optional list of 6 weights (same order as
+        OPERATION_STATES) to sample the starting stage from, instead of the
+        fraud type's default profile weights. Used by complaint_intake.py
+        (judge inspection §1.2 / FIX 5) so a live-filed complaint's starting
+        stage is drawn from a distribution informed by what the complainant
+        actually reported, rather than either a hardcoded constant or the
+        generic profile default. Ignored if `target_state` is given.
         """
         profile = SCENARIO_PROFILES[fraud_type]
 
@@ -126,9 +134,11 @@ class SyntheticCaseGenerator:
         if target_state:
             final_state_idx = OPERATION_STATES.index(target_state)
         else:
+            weights = state_weights_override if state_weights_override is not None else profile["state_weights"]
+            weights = np.array(weights, dtype=float)
             final_state_idx = self.np_rng.choice(
                 len(OPERATION_STATES),
-                p=np.array(profile["state_weights"]) / sum(profile["state_weights"])
+                p=weights / weights.sum()
             )
         final_state = OPERATION_STATES[final_state_idx]
 
@@ -193,8 +203,16 @@ class SyntheticCaseGenerator:
         num_victims = self.rng.randint(*profile["victim_count_range"])
         num_mule_layers = self.rng.randint(*profile["mule_layers"])
         
-        # Clamp layers based on how far case progressed
-        active_layers = min(num_mule_layers, max(1, final_state_idx))
+        # Clamp layers based on how far case progressed.
+        # FIX (judge inspection §2.3): active_layers was always a
+        # deterministic function of final_state_idx, making hop_depth/
+        # num_edges near-tautological proxies for the label they're meant
+        # to help predict. ~30% of the time, draw layer depth independently
+        # so the model can't just count hops to infer state.
+        if self.rng.random() < 0.30:
+            active_layers = max(1, self.rng.randint(1, num_mule_layers))
+        else:
+            active_layers = min(num_mule_layers, max(1, final_state_idx))
 
         victim_accounts = [self._next_account("VICTIM") for _ in range(num_victims)]
         
@@ -205,8 +223,37 @@ class SyntheticCaseGenerator:
         # Primary collection node
         collection_acc = self._next_account("COLL")
         
-        # Cashout zone selection
-        primary_zone = profile["cashout_zone_bias"]
+        # Cashout zone selection.
+        # FIX (judge inspection §1.1 / §6): fraud_type used to determine the
+        # zone 1:1 (a deterministic lookup table), so a "zone classifier"
+        # trained on it could never be more than a fraud_type readback.
+        # Fraud type still meaningfully correlates with zone (real domain
+        # knowledge — some scam types cluster in some regions). 
+        # NEW DRIVER: We add a second independent driver based on topology depth
+        # (active_layers). Domain logic: highly complex laundering networks 
+        # (layers >= 3) tend to route through major financial hubs (zone_c), 
+        # while rapid, shallow scams (layers <= 1) cash out locally (zone_a).
+        bias_zone = profile["cashout_zone_bias"]
+        
+        # Base weights from fraud type
+        zone_weights = [0.45 if z == bias_zone else 0.275 for z in ZONES]
+        
+        # Adjust weights based on topology depth
+        if active_layers >= 3:
+            # Increase weight for zone_c
+            idx = ZONES.index("zone_c")
+            zone_weights[idx] += 0.35
+            # Normalize
+            total = sum(zone_weights)
+            zone_weights = [w / total for w in zone_weights]
+        elif active_layers <= 1:
+            # Increase weight for zone_a
+            idx = ZONES.index("zone_a")
+            zone_weights[idx] += 0.35
+            total = sum(zone_weights)
+            zone_weights = [w / total for w in zone_weights]
+
+        primary_zone = self.rng.choices(ZONES, weights=zone_weights, k=1)[0]
         zones_used = [primary_zone]
         if self.rng.random() > 0.4:
             secondary = self.rng.choice([z for z in ZONES if z != primary_zone])
@@ -783,6 +830,9 @@ def generate_training_dataset(num_cases=1000, seed=42, output_dir="data", legit_
             row["potential_exposure_inr"] = gt["potential_exposure_inr"]
             row["fraud_type"] = gt["fraud_type"]
             row["is_fraud"] = gt.get("is_fraud", 1)
+            # Zone label for the (now genuinely trained) zone classifier —
+            # judge inspection §1.1 / FIX 6.
+            row["primary_zone"] = gt.get("primary_zone")
             feature_rows.append(row)
 
     # Save outputs

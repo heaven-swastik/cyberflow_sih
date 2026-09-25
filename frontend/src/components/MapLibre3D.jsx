@@ -16,9 +16,32 @@ const ZONE_COLORS = {
 };
 
 // Free light style from OpenFreeMap
-const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+const LIGHT_STYLE = {
+  version: 8,
+  sources: {
+    'osm': {
+      type: 'raster',
+      tiles: [
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+      ],
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap Contributors'
+    }
+  },
+  layers: [
+    {
+      id: 'osm',
+      type: 'raster',
+      source: 'osm',
+      minzoom: 0,
+      maxzoom: 19
+    }
+  ]
+};
 
-export default function MapLibre3D({ atmCandidates = [], locationCandidates = [], deviceLocation = null, selectedAtmId = null, onAtmClick }) {
+export default function MapLibre3D({ atmCandidates = [], locationCandidates = [], deviceLocation = null, withdrawalHistory = [], selectedAtmId = null, onAtmClick }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -61,19 +84,10 @@ export default function MapLibre3D({ atmCandidates = [], locationCandidates = []
 
     // Apply light overlay once style loads
     map.on('load', () => {
-      // Try to add 3D building extrusion if the style has the buildings layer
-      try {
-        const layers = map.getStyle().layers;
-        // Find fill-extrusion layer or add one if base buildings layer exists
-        const buildingLayer = layers?.find(l => l.id.includes('building') || l.id.includes('extrusion'));
-        if (buildingLayer) {
-          map.setPaintProperty(buildingLayer.id, 'fill-extrusion-color', '#ffffff');
-          map.setPaintProperty(buildingLayer.id, 'fill-extrusion-opacity', 0.9);
-        }
-      } catch(e) { /* style may not have building layers */ }
+      // Removed building extrusion logic to prevent WebGL renderer crashes on unsupported styles
 
       // Add ATM markers as a GeoJSON source
-      addMarkers(map, atmCandidates, locationCandidates, deviceLocation, onAtmClick);
+      addMarkers(map, atmCandidates, locationCandidates, deviceLocation, withdrawalHistory, onAtmClick);
     });
 
     return () => {
@@ -105,14 +119,14 @@ export default function MapLibre3D({ atmCandidates = [], locationCandidates = []
     const map = mapRef.current;
     if (!map) return;
     if (!map.isStyleLoaded()) {
-      map.once('load', () => addMarkers(map, atmCandidates, locationCandidates, deviceLocation, onAtmClick));
+      map.once('load', () => addMarkers(map, atmCandidates, locationCandidates, deviceLocation, withdrawalHistory, onAtmClick));
     } else {
       // Clear old markers
       markersRef.current.forEach(m => m.remove());
       markersRef.current = [];
-      addMarkers(map, atmCandidates, locationCandidates, deviceLocation, onAtmClick, markersRef);
+      addMarkers(map, atmCandidates, locationCandidates, deviceLocation, withdrawalHistory, onAtmClick, markersRef);
     }
-  }, [atmCandidates, locationCandidates, deviceLocation]);
+  }, [atmCandidates, locationCandidates, deviceLocation, withdrawalHistory]);
 
   return (
     <div
@@ -128,12 +142,35 @@ export default function MapLibre3D({ atmCandidates = [], locationCandidates = []
   );
 }
 
-function addMarkers(map, atmCandidates, locationCandidates, deviceLocation, onAtmClick, markersRef) {
+function addMarkers(map, atmCandidates, locationCandidates, deviceLocation, withdrawalHistory, onAtmClick, markersRef) {
   const markers = [];
 
+  
+  // Historical withdrawals
+  if (withdrawalHistory && withdrawalHistory.length > 0) {
+    withdrawalHistory.forEach((wd) => {
+      if (!wd.longitude || !wd.latitude) return;
+      const el = createMarkerEl('bank', '#8a9390', 'Past', 30);
+      el.style.opacity = '0.8';
+      el.style.animation = 'none'; // No pulse
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([wd.longitude, wd.latitude])
+        .setPopup(new maplibregl.Popup({ offset: 15 }).setHTML(
+          `<div style="font-family:IBM Plex Sans,sans-serif;padding:8px">
+            <div style="font-weight:700;color:#8a9390">Past Withdrawal</div>
+            <div style="font-size:0.8rem">₹${wd.amount_inr} at ${wd.atm_id}</div>
+            <div style="font-size:0.75rem;color:#666">${wd.days_ago} days ago</div>
+          </div>`
+        ))
+        .addTo(map);
+      markers.push(marker);
+    });
+  }
+  
   // Device location marker
+
   if (deviceLocation?.longitude && deviceLocation?.latitude) {
-    const el = createMarkerEl('📱', '#5b8fd6', 'Device Last Seen', 36);
+    const el = createMarkerEl('device', '#5b8fd6', 'Device', 42);
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([deviceLocation.longitude, deviceLocation.latitude])
       .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
@@ -152,8 +189,8 @@ function addMarkers(map, atmCandidates, locationCandidates, deviceLocation, onAt
     atmCandidates.forEach((atm, i) => {
       if (!atm.longitude || !atm.latitude) return;
       const isTop = i === 0;
-      const color = isTop ? '#41dc8f' : '#e2954a';
-      const el = createMarkerEl('🏧', color, `#${i+1}`, isTop ? 44 : 36);
+      const color = '#e4483f';
+        const el = createMarkerEl('atm', color, `#${i+1}`, isTop ? 56 : 42);
       const popup = new maplibregl.Popup({ offset: 25 }).setHTML(
         `<div style="font-family:IBM Plex Sans,sans-serif;padding:10px;min-width:180px">
           <div style="font-weight:700;font-size:1rem;margin-bottom:4px">${atm.bank_name} ATM</div>
@@ -187,19 +224,18 @@ function addMarkers(map, atmCandidates, locationCandidates, deviceLocation, onAt
   return markers;
 }
 
-function createMarkerEl(emoji, color, label, size = 40) {
+function createMarkerEl(type, color, label, size = 40) {
   const el = document.createElement('div');
-  el.style.cssText = `
-    width:${size}px;height:${size}px;border-radius:50%;
-    background:${color}22;border:2px solid ${color};
-    display:flex;align-items:center;justify-content:center;
-    font-size:${size * 0.4}px;cursor:pointer;
-    box-shadow:0 0 12px ${color}44;
-    position:relative;
-  `;
-  el.innerHTML = emoji;
-  // Pulsing ring
-  el.style.animation = 'pulse-marker 2s ease infinite';
+  if (type === 'atm') {
+    el.style.cssText = `width:${size}px;height:${size}px;cursor:pointer;filter:drop-shadow(0 0 8px rgba(228,72,63,0.8));`;
+    el.innerHTML = `<svg viewBox="0 0 24 24" width="${size}" height="${size}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`;
+  } else if (type === 'device') {
+    el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color}33;border:3px solid ${color};display:flex;align-items:center;justify-content:center;font-weight:bold;color:${color};font-size:${size*0.4}px;cursor:pointer;box-shadow:0 0 12px ${color}66;`;
+    el.textContent = 'D';
+  } else {
+    el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color}33;border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-weight:bold;color:${color};font-size:${size*0.4}px;cursor:pointer;opacity:0.8;`;
+    el.textContent = 'W';
+  }
   return el;
 }
 

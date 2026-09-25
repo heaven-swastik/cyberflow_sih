@@ -25,6 +25,7 @@ import ComplaintPortal from './components/ComplaintPortal';
 import ComplainantDashboard from './components/ComplainantDashboard';
 import ApiIntegrationPanel from './components/ApiIntegrationPanel';
 import NCRPDemo from './components/NCRPDemo';
+import AIAnalysisOverlay from './components/AIAnalysisOverlay';
 import { stateLabel, stateColor } from './utils/format';
 
 // The actual app shell — separated so useAuth() works inside AuthProvider
@@ -43,6 +44,7 @@ function AppContent() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showMacroHeatmap, setShowMacroHeatmap] = useState(false);
   const [showComplaintTracker, setShowComplaintTracker] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [userCaseIds, setUserCaseIds] = useState([]);
 
   // Step 2 (Correlate) state
@@ -151,10 +153,14 @@ function AppContent() {
   // Navigation
   const openCase = useCallback((caseId) => {
     setSelectedCaseId(caseId);
-    setView('workspace');
+    if (isOfficer || isAdmin) {
+      setIsAnalyzing(true);
+    } else {
+      setView('workspace');
+    }
     setCurrentStep(1);
     setCompletedSteps(new Set());
-  }, []);
+  }, [isOfficer, isAdmin]);
 
   const goBackToLanding = useCallback(() => {
     setSimulationRunning(false);
@@ -276,6 +282,7 @@ function AppContent() {
         onLogout={logout}
       />
       <div className="app-main">
+        {isAnalyzing && <AIAnalysisOverlay onComplete={() => { setIsAnalyzing(false); setView('workspace'); }} />}
       {/* Header — always visible */}
       <header className="app-header">
         <div className="app-header-left">
@@ -432,6 +439,7 @@ function AppContent() {
             {/* Step content */}
             <div className="wizard-step-container">
               <AnimatePresence mode="wait">
+
                 <motion.div
                   key={currentStep}
                   initial={{ opacity: 0, y: 16 }}

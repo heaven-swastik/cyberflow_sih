@@ -24,13 +24,17 @@ def verify():
 
 def heal_chain():
     bc = get_chain()
-    # Simple heal: recalculate hashes for all blocks based on current data
+    # FIX: Never silently launder tampering.
+    broken_idx = -1
     if len(bc.chain) > 1:
         for i in range(1, len(bc.chain)):
-            bc.chain[i].previous_hash = bc.chain[i-1].hash
-            bc.chain[i].hash = bc.chain[i].calculate_hash()
-        bc.save(CHAIN_PATH)
-    print(json.dumps({"status": "healed", "length": len(bc.chain)}))
+            if bc.chain[i].previous_hash != bc.chain[i-1].hash or bc.chain[i].hash != bc.chain[i].calculate_hash():
+                broken_idx = i
+                break
+    if broken_idx != -1:
+        print(json.dumps({"status": "TAMPER_DETECTED", "broken_at_index": broken_idx}))
+    else:
+        print(json.dumps({"status": "healed", "length": len(bc.chain)}))
 
 def get_all():
     bc = get_chain()

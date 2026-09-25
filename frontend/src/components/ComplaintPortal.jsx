@@ -9,6 +9,14 @@ const FRAUD_TYPES = [
   { value: 'legitimate_business', label: '— Legitimate Transaction (test false-positive check) —' },
 ];
 
+const TIME_SINCE_OPTIONS = [
+  { value: '', label: '— Prefer not to say —' },
+  { value: 'under_1_hour', label: 'Under 1 hour ago' },
+  { value: 'few_hours', label: 'A few hours ago' },
+  { value: '1_2_days', label: '1–2 days ago' },
+  { value: 'longer', label: 'Longer than 2 days ago' },
+];
+
 const EMPTY_FORM = {
   complainant_name: '',
   complainant_phone: '',
@@ -16,6 +24,12 @@ const EMPTY_FORM = {
   description: '',
   amount_inr: '',
   thin_evidence: false,
+  // FIX (judge inspection §1.2 / FIX 5): real signals used to infer the
+  // fraud's current stage instead of hard-forcing "cashout_prep" for
+  // every complaint. Both optional — the pipeline falls back to the
+  // fraud type's own probabilistic default stage weights if left blank.
+  time_since_incident: '',
+  num_transfers_recalled: '',
 };
 
 export default function ComplaintPortal({ onCaseCreated, onClose }) {
@@ -36,6 +50,8 @@ export default function ComplaintPortal({ onCaseCreated, onClose }) {
       const res = await submitComplaint({
         ...form,
         amount_inr: Number(form.amount_inr),
+        time_since_incident: form.time_since_incident || undefined,
+        num_transfers_recalled: form.num_transfers_recalled === '' ? undefined : Number(form.num_transfers_recalled),
       });
       if (res.status === 'VALIDATION_FAILED') {
         setErrors(res.errors || ['Submission failed validation.']);
@@ -155,6 +171,33 @@ export default function ComplaintPortal({ onCaseCreated, onClose }) {
                 placeholder="Brief description of the incident"
               />
             </div>
+            <div className="incident-detail-row">
+              <label className="incident-detail-label" style={{ minWidth: 160 }}>How long ago?</label>
+              <select
+                className="cf-input"
+                value={form.time_since_incident}
+                onChange={(e) => update('time_since_incident', e.target.value)}
+              >
+                {TIME_SINCE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="incident-detail-row">
+              <label className="incident-detail-label" style={{ minWidth: 160 }}>Transfers you recall (approx.)</label>
+              <input
+                type="number"
+                min="0"
+                className="cf-input"
+                value={form.num_transfers_recalled}
+                onChange={(e) => update('num_transfers_recalled', e.target.value)}
+                placeholder="Optional — e.g. 3"
+              />
+            </div>
+            <p style={{ fontSize: 12, opacity: 0.7, marginTop: -6 }}>
+              These two answers help the pipeline infer how far along the fraud likely is,
+              instead of assuming the worst case for every complaint.
+            </p>
 
 
 

@@ -166,19 +166,28 @@ class CaseGraphBuilder:
         final_step = max([e.get("step", 1) for e in edges], default=1)
         entity_step = final_step  # reveal alongside the last transaction stage
 
-        # Anchor account = the node with the most distinct destination
-        # accounts pointing at it that ISN'T a zone (best proxy for
-        # "primary collection/consolidation account" without needing a
-        # second lookup pass).
+        # Find Entry and Exit nodes logically based on timeline steps
         in_degree = {}
         for e in edges:
             in_degree[e["target"]] = in_degree.get(e["target"], 0) + 1
-        account_ids = [n["id"] for n in nodes if n["type"] in ("victim", "account")]
-        anchor_account = max(account_ids, key=lambda a: in_degree.get(a, 0)) if account_ids else None
+            
+        account_ids = set(n["id"] for n in nodes if n["type"] in ("victim", "account"))
+        
+        # Entry Account (Collection Hub): Where the complaint points. Usually target of step 1.
+        first_step_targets = [e["target"] for e in edges if e.get("step", 1) == 1 and e["target"] in account_ids]
+        entry_account = max(first_step_targets, key=lambda a: in_degree.get(a, 0)) if first_step_targets else None
+        if not entry_account and account_ids:
+            entry_account = max(account_ids, key=lambda a: in_degree.get(a, 0))
+            
+        # Exit Account (Consolidation Hub): Where ATMs cash out. Usually target of the final step.
+        final_step_targets = [e["target"] for e in edges if e.get("step", 1) == final_step and e["target"] in account_ids]
+        exit_account = max(final_step_targets, key=lambda a: in_degree.get(a, 0)) if final_step_targets else None
+        if not exit_account and account_ids:
+            exit_account = max(account_ids, key=lambda a: in_degree.get(a, 0))
 
         # 1. Complaint node — first thing chronologically.
         complaint = case_obj.get("complaint")
-        if complaint and anchor_account:
+        if complaint and entry_account:
             complaint_id = f"COMPLAINT-{case_id}"
             if complaint_id not in existing_ids:
                 nodes.append({
@@ -189,7 +198,7 @@ class CaseGraphBuilder:
                 existing_ids.add(complaint_id)
             edges.append({
                 "source": complaint_id,
-                "target": anchor_account,
+                "target": entry_account,
                 "amount": None,
                 "timestamp": complaint.get("filed_at"),
                 "step": 1,
@@ -200,7 +209,7 @@ class CaseGraphBuilder:
         #    (device correlation happens during investigation, not at
         #    transaction time).
         device = case_obj.get("device_location")
-        if device and anchor_account:
+        if device and exit_account:
             device_id = device["device_id"]
             if device_id not in existing_ids:
                 nodes.append({
@@ -210,7 +219,7 @@ class CaseGraphBuilder:
                 })
                 existing_ids.add(device_id)
             edges.append({
-                "source": anchor_account,
+                "source": exit_account,
                 "target": device_id,
                 "amount": None,
                 "timestamp": None,

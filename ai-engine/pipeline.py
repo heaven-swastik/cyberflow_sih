@@ -44,10 +44,13 @@ def _build_model_proof(engine, models_dir):
         "action_predictor.json",
         "risk_scorer.json",
         "priority_classifier.json",
+        "zone_classifier.json",
     ]
     fingerprints = {}
     for filename in model_files:
         path = os.path.join(models_dir, filename)
+        if not os.path.exists(path):
+            continue  # zone_classifier.json is optional/backward-compatible — see classifier.py
         with open(path, "rb") as model_file:
             fingerprints[filename] = hashlib.sha256(model_file.read()).hexdigest()
 
