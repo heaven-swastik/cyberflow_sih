@@ -50,7 +50,8 @@ from pipeline import process_case
 # "honest guardrail" features live, on demand, instead of hoping a random
 # demo case happens to land in that state:
 #   - legitimate_business: routes through the SAME generator used for the
-#     false-positive evaluation (SIH_PITCH.md section 7), so a judge can
+#     false-positive evaluation (see README.md "Final Evaluation Numbers"),
+#     so a judge can
 #     file a "legitimate" transaction and watch it get cleared instead of
 #     flagged.
 #   - thin_evidence flag (separate from fraud_type, see below): forces a
@@ -245,7 +246,7 @@ def process_new_complaint(complaint, transactions_context=None, models_dir=None)
     gen = SyntheticCaseGenerator(seed=abs(hash(case_id)) % (2**31))
     if is_legit_demo:
         # Same generator used for the false-positive evaluation in
-        # evaluation.py / SIH_PITCH.md section 7: recurring small
+        # evaluation.py (see README.md "Final Evaluation Numbers"):
         # vendor/payroll payments + one larger supplier payment.
         txs, gt = gen.generate_legitimate_case(case_id)
     else:

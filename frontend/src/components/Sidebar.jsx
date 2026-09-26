@@ -19,9 +19,12 @@ export default function Sidebar({
   isAdmin,
   isComplainant,
   isOfficer,
+  onGoLanding,
   onGoDashboard,
   onOpenComplaintPortal,
-  onOpenAdminPanel, onOpenMacroHeatmap,
+  onOpenAdminPanel,
+  onOpenMacroHeatmap,
+  onOpenKeyDeliverables,
   onOpenComplaintTracker,
   onOpenApiIntegration,
   onLogout,
@@ -30,23 +33,24 @@ export default function Sidebar({
 }) {
   return (
     <aside className="sidebar-rail">
-      <div className="sidebar-logo" title="CyberFlow">CF</div>
+      <div className="sidebar-logo" title="CyberFlow" onClick={onGoLanding} style={{cursor: 'pointer'}}>CF</div>
 
       <nav className="sidebar-nav">
         <NavIcon
           icon="📊"
-          label="Dashboard"
+          label="Home / Landing"
           active={view === 'landing'}
-          onClick={onGoDashboard}
+          onClick={onGoLanding}
         />
         {isAuthenticated && (isAdmin || isOfficer) && (
           <NavIcon
             icon="🛡️"
-            label="Active Investigations"
-            active={false}
+            label="Active Investigations Dashboard"
+            active={view === 'dashboard' || view === 'workspace'}
             onClick={onGoDashboard}
           />
         )}
+
         {isAuthenticated && isComplainant && (
           <NavIcon
             icon="➕"
@@ -63,10 +67,10 @@ export default function Sidebar({
             onClick={onOpenApiIntegration}
           />
         )}
-        {isAuthenticated && isAdmin && (
+        {isAuthenticated && (isAdmin || isOfficer) && (
           <NavIcon
             icon="🌐"
-            label="Command Center"
+            label="Risk Heatmap Dashboard (GIS)"
             active={false}
             accentColor="#3182ce"
             onClick={onOpenMacroHeatmap}

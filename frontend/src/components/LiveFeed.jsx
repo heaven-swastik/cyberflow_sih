@@ -7,7 +7,7 @@ export default function LiveFeed() {
   useEffect(() => {
     let mounted = true;
     const fetchFeed = () => {
-      fetch('/api/feed', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
+      fetch('/api/feed', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cyberflow_token') } })
         .then(r => r.json())
         .then(data => {
           if (mounted && Array.isArray(data)) {

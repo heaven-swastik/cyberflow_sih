@@ -5,7 +5,7 @@ export default function EvidencePanel({ caseId, caseData }) {
 
   useEffect(() => {
     fetch('/api/model-proof', {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('cyberflow_token')}` }
     })
       .then(r => r.json())
       .then(data => setProofData(data))

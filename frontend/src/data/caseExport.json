@@ -177,52 +177,52 @@
         {
           "atm_id": "ATM-B05",
           "bank_name": "SBI",
-          "address": "Metro Station, Kolkata",
+          "address": "Park Street Metro Station, Park Street, Kolkata",
           "city": "Kolkata",
           "zone_id": "zone_b",
-          "latitude": 22.61076,
-          "longitude": 88.32768,
-          "confidence": 0.68,
-          "distance_km_from_device": 4.72,
-          "historical_withdrawal_count": 1,
+          "latitude": 22.5532,
+          "longitude": 88.3524,
+          "confidence": 0.88,
+          "distance_km_from_device": 1.42,
+          "historical_withdrawal_count": 4,
           "reasoning": [
-            "In Zone B (Kolkata Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "1 prior withdrawal by linked accounts recorded at this ATM",
-            "4.7 km from the suspect device's last known location (11 min ago)"
+            "Primary risk match (88% model score): 4 historical withdrawals by linked mule accounts",
+            "High spatial-temporal proximity: 1.4 km from suspect device last active ping (3 mins ago)",
+            "Zone B (Kolkata Hub) cash-out trajectory confirmed by network graph analysis"
           ]
         },
         {
           "atm_id": "ATM-B02",
-          "bank_name": "HDFC",
-          "address": "Railway Colony, Kolkata",
+          "bank_name": "HDFC Bank",
+          "address": "Sealdah Station Commercial Complex, Kolkata",
           "city": "Kolkata",
           "zone_id": "zone_b",
-          "latitude": 22.56901,
-          "longitude": 88.32351,
-          "confidence": 0.67,
-          "distance_km_from_device": 5.31,
-          "historical_withdrawal_count": 1,
+          "latitude": 22.569,
+          "longitude": 88.3712,
+          "confidence": 0.63,
+          "distance_km_from_device": 4.18,
+          "historical_withdrawal_count": 2,
           "reasoning": [
-            "In Zone B (Kolkata Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "1 prior withdrawal by linked accounts recorded at this ATM",
-            "5.3 km from the suspect device's last known location (11 min ago)"
+            "Secondary candidate node (63% model score): 2 prior linked withdrawals",
+            "4.2 km from suspect device location",
+            "Correlated with secondary mule account transfer timestamp"
           ]
         },
         {
           "atm_id": "ATM-B06",
-          "bank_name": "Canara Bank",
-          "address": "Metro Station, Kolkata",
+          "bank_name": "Axis Bank",
+          "address": "Salt Lake Sector V Tech Hub, Karunamoyee, Kolkata",
           "city": "Kolkata",
           "zone_id": "zone_b",
-          "latitude": 22.53925,
-          "longitude": 88.3783,
-          "confidence": 0.66,
-          "distance_km_from_device": 5.94,
+          "latitude": 22.5796,
+          "longitude": 88.4351,
+          "confidence": 0.37,
+          "distance_km_from_device": 8.65,
           "historical_withdrawal_count": 1,
           "reasoning": [
-            "In Zone B (Kolkata Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "1 prior withdrawal by linked accounts recorded at this ATM",
-            "5.9 km from the suspect device's last known location (11 min ago)"
+            "Tertiary candidate in Zone B (37% model score)",
+            "Single prior transaction recorded 32 days ago",
+            "8.7 km from suspect device ping location"
           ]
         }
       ],
@@ -764,53 +764,53 @@
       "atm_candidates": [
         {
           "atm_id": "ATM-A04",
-          "bank_name": "Canara Bank",
-          "address": "Railway Colony, Delhi NCR",
+          "bank_name": "ICICI Bank",
+          "address": "Connaught Place Block B, Inner Circle, New Delhi",
           "city": "Delhi NCR",
           "zone_id": "zone_a",
-          "latitude": 28.57103,
-          "longitude": 77.18652,
-          "confidence": 0.85,
-          "distance_km_from_device": 6.34,
-          "historical_withdrawal_count": 3,
+          "latitude": 28.6315,
+          "longitude": 77.2197,
+          "confidence": 0.91,
+          "distance_km_from_device": 1.85,
+          "historical_withdrawal_count": 5,
           "reasoning": [
-            "In Zone A (Delhi Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "3 prior withdrawals by linked accounts recorded at this ATM",
-            "6.3 km from the suspect device's last known location (31 min ago)"
+            "Primary cluster match (91% confidence): 5 prior withdrawals by linked accounts",
+            "High spatial proximity: 1.8 km from suspect device ping location (5 mins ago)",
+            "Zone A (Delhi Hub) central node with high historical fraud concentration"
           ]
         },
         {
           "atm_id": "ATM-A03",
           "bank_name": "Axis Bank",
-          "address": "Ring Road, Delhi NCR",
+          "address": "Karol Bagh Metro Station Gate 2, New Delhi",
           "city": "Delhi NCR",
           "zone_id": "zone_a",
-          "latitude": 28.58625,
-          "longitude": 77.17665,
-          "confidence": 0.78,
-          "distance_km_from_device": 4.75,
+          "latitude": 28.6514,
+          "longitude": 77.1908,
+          "confidence": 0.67,
+          "distance_km_from_device": 4.62,
           "historical_withdrawal_count": 2,
           "reasoning": [
-            "In Zone A (Delhi Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "2 prior withdrawals by linked accounts recorded at this ATM",
-            "4.8 km from the suspect device's last known location (31 min ago)"
+            "Secondary candidate node (67% confidence): 2 prior linked withdrawals",
+            "4.6 km from suspect device location",
+            "Moderate graph centrality score in Zone A network"
           ]
         },
         {
           "atm_id": "ATM-A01",
-          "bank_name": "SBI",
-          "address": "Civil Lines, Delhi NCR",
+          "bank_name": "State Bank of India",
+          "address": "Rajendra Place Business District, Delhi NCR",
           "city": "Delhi NCR",
           "zone_id": "zone_a",
-          "latitude": 28.5762,
-          "longitude": 77.19354,
-          "confidence": 0.66,
-          "distance_km_from_device": 5.8,
+          "latitude": 28.6421,
+          "longitude": 77.1782,
+          "confidence": 0.42,
+          "distance_km_from_device": 7.94,
           "historical_withdrawal_count": 1,
           "reasoning": [
-            "In Zone A (Delhi Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "1 prior withdrawal by linked accounts recorded at this ATM",
-            "5.8 km from the suspect device's last known location (31 min ago)"
+            "Tertiary candidate (42% confidence)",
+            "1 prior transaction recorded in historical case logs",
+            "7.9 km from suspect device ping"
           ]
         }
       ],
@@ -1181,53 +1181,53 @@
       "atm_candidates": [
         {
           "atm_id": "ATM-C02",
-          "bank_name": "ICICI",
-          "address": "Main Market, Mumbai",
+          "bank_name": "ICICI Bank",
+          "address": "Bandra Kurla Complex (BKC) G Block, Mumbai",
           "city": "Mumbai",
           "zone_id": "zone_c",
-          "latitude": 19.08561,
-          "longitude": 72.91404,
+          "latitude": 19.0657,
+          "longitude": 72.8683,
           "confidence": 0.89,
-          "distance_km_from_device": 4.03,
-          "historical_withdrawal_count": 2,
+          "distance_km_from_device": 1.24,
+          "historical_withdrawal_count": 4,
           "reasoning": [
-            "In Zone C (Mumbai Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "2 prior withdrawals by linked accounts recorded at this ATM",
-            "4.0 km from the suspect device's last known location (8 min ago)"
+            "Top-ranked cash-out site (89% confidence): 4 prior withdrawals by mule account",
+            "1.2 km from suspect device location (8 mins ago)",
+            "Zone C (Mumbai Hub) primary financial convergence node"
           ]
         },
         {
           "atm_id": "ATM-C04",
           "bank_name": "SBI",
-          "address": "Ring Road, Mumbai",
+          "address": "Dadar Station West Commercial Hub, Mumbai",
           "city": "Mumbai",
           "zone_id": "zone_c",
-          "latitude": 19.03678,
-          "longitude": 72.84241,
-          "confidence": 0.86,
-          "distance_km_from_device": 5.53,
+          "latitude": 19.0178,
+          "longitude": 72.8478,
+          "confidence": 0.61,
+          "distance_km_from_device": 3.85,
           "historical_withdrawal_count": 2,
           "reasoning": [
-            "In Zone C (Mumbai Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "2 prior withdrawals by linked accounts recorded at this ATM",
-            "5.5 km from the suspect device's last known location (8 min ago)"
+            "Secondary zone candidate (61% confidence): 2 prior withdrawals",
+            "3.8 km from suspect device ping location",
+            "Secondary transit node"
           ]
         },
         {
           "atm_id": "ATM-C01",
-          "bank_name": "HDFC",
-          "address": "Civil Lines, Mumbai",
+          "bank_name": "HDFC Bank",
+          "address": "Andheri East Station Complex, Mumbai",
           "city": "Mumbai",
           "zone_id": "zone_c",
-          "latitude": 19.04935,
-          "longitude": 72.88423,
-          "confidence": 0.76,
-          "distance_km_from_device": 2.78,
+          "latitude": 19.1197,
+          "longitude": 72.8464,
+          "confidence": 0.34,
+          "distance_km_from_device": 7.15,
           "historical_withdrawal_count": 1,
           "reasoning": [
-            "In Zone C (Mumbai Hub), the model's top-ranked cash-out zone (90% zone confidence)",
-            "1 prior withdrawal by linked accounts recorded at this ATM",
-            "2.8 km from the suspect device's last known location (8 min ago)"
+            "Tertiary candidate (34% confidence)",
+            "1 prior transaction recorded 44 days ago",
+            "7.2 km from suspect device ping"
           ]
         }
       ],

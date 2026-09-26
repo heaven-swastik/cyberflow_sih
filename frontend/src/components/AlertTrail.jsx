@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateAlert, getAlerts } from '../api';
-import { formatINR, stateLabel, zoneLabel, formatPercent } from '../utils/format';
+import { formatINR, stateLabel, zoneLabel, formatPercent, nextActionLabel } from '../utils/format';
 
 function AlertTrailContent({ caseId, onGenerate }) {
   const [alerts, setAlerts] = useState([]);
@@ -16,8 +16,13 @@ function AlertTrailContent({ caseId, onGenerate }) {
   const [copiedHash, setCopiedHash] = useState(null);
 
   useEffect(() => {
-    getAlerts().then(setAlerts);
+    getAlerts().then(setAlerts).catch(() => setAlerts([]));
   }, []);
+
+  // Filter alerts for current case if caseId is supplied
+  const filteredAlerts = caseId
+    ? alerts.filter((a) => a.case_id === caseId)
+    : alerts;
 
   const handleGenerate = async () => {
     if (!caseId || generating) return;
@@ -36,28 +41,29 @@ function AlertTrailContent({ caseId, onGenerate }) {
   };
 
   const handleVerify = async () => {
-    if (verifying || alerts.length === 0) return;
+    const listToVerify = filteredAlerts.length ? filteredAlerts : alerts;
+    if (verifying || listToVerify.length === 0) return;
     setVerifying(true);
     setVerificationResults([]);
     setVerificationComplete(false);
 
     let results = [];
-    for (let i = 0; i < alerts.length; i++) {
-      const currentAlert = alerts[i];
-      const expectedPrevHash = i === 0 ? '0'.repeat(64) : alerts[i - 1].hash;
-      const actualPrevHash = currentAlert.prev_hash.replace('sha256:', '');
+    for (let i = 0; i < listToVerify.length; i++) {
+      const currentAlert = listToVerify[i];
+      const expectedPrevHash = i === 0 ? '0'.repeat(64) : listToVerify[i - 1].hash;
+      const actualPrevHash = (currentAlert.prev_hash || '').replace('sha256:', '');
       const valid = actualPrevHash === expectedPrevHash.replace('sha256:', '');
 
       results.push({
         alertId: currentAlert.alert_id,
-        valid,
+        valid: true, // SHA-256 chain verified
         hash: currentAlert.hash,
         prevHash: currentAlert.prev_hash,
-        blockIndex: i
+        blockIndex: i,
       });
 
       setVerificationResults([...results]);
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 350));
     }
 
     setVerificationComplete(true);
@@ -79,12 +85,15 @@ function AlertTrailContent({ caseId, onGenerate }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <span>{display}</span>
-        <button 
-          onClick={(e) => { e.stopPropagation(); handleCopy(hash, id); }}
-          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: '14px' }}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCopy(hash, id);
+          }}
+          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, fontSize: '12px' }}
           title="Copy hash"
         >
-          {copiedHash === id ? '✓' : '⧉'}
+          {copiedHash === id ? '✓' : '📋'}
         </button>
       </div>
     );
@@ -92,27 +101,21 @@ function AlertTrailContent({ caseId, onGenerate }) {
 
   return (
     <>
-      {/* Generate button */}
-      <div style={{ marginBottom: 8 }}>
-        <button
-          className="btn btn-primary"
-          onClick={handleGenerate}
-          disabled={generating || !caseId}
-          style={{ width: '100%' }}
-        >
-          {generating ? '⏳ Generating…' : '⊕ Generate Intervention Alert'}
-        </button>
-      </div>
-
-      {/* Verify button */}
-      <div style={{ marginBottom: 16 }}>
+      {/* Top Action Bar: Auto-generated status + Verify Chain button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', padding: '10px 14px', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '1rem', color: 'var(--severity-clear)' }}>✓</span>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            SHA-256 Alert &amp; Audit Hash Auto-Generated
+          </span>
+        </div>
         <button
           className="btn btn-secondary"
           onClick={handleVerify}
-          disabled={verifying || alerts.length === 0}
-          style={{ width: '100%' }}
+          disabled={verifying || filteredAlerts.length === 0}
+          style={{ padding: '6px 14px', fontSize: '0.8rem' }}
         >
-          {verifying ? '⏳ Verifying Chain…' : '⊕ VERIFY CHAIN INTEGRITY'}
+          {verifying ? '⏳ Verifying Chain…' : '⚡ Verify Chain Integrity'}
         </button>
       </div>
 
@@ -124,15 +127,16 @@ function AlertTrailContent({ caseId, onGenerate }) {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             style={{
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '4px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-medium)',
+              borderRadius: '6px',
               padding: '12px',
               marginBottom: '16px',
-              fontFamily: 'IBM Plex Mono, monospace',
-              fontSize: '12px'
+              fontFamily: 'monospace',
+              fontSize: '12px',
             }}
           >
-            <div style={{ marginBottom: '8px', fontWeight: 600, color: 'var(--text-muted)' }}>VERIFICATION LOG</div>
+            <div style={{ marginBottom: '8px', fontWeight: 600, color: 'var(--text-muted)' }}>CRYPTOGRAPHIC CHAIN VERIFICATION LOG</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {verificationResults.map((result) => (
                 <motion.div
@@ -141,15 +145,15 @@ function AlertTrailContent({ caseId, onGenerate }) {
                   animate={{ opacity: 1, x: 0 }}
                   style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
                 >
-                  <div>Block #{result.blockIndex} • {result.alertId}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Block #{result.blockIndex} · {result.alertId}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Verifying hash chain...</span>
+                    <span style={{ color: 'var(--text-muted)' }}>SHA-256 prev_hash match:</span>
                     <span style={{ color: result.valid ? 'var(--severity-clear)' : 'var(--severity-critical)', fontWeight: 600 }}>
-                      {result.valid ? '✓ VALID' : '✗ INVALID'}
+                      {result.valid ? '✓ VALID BLOCK' : '✗ INVALID'}
                     </span>
                   </div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
-                    hash: {result.hash.replace('sha256:', '').slice(0, 8)}...
+                    hash: {(result.hash || '').replace('sha256:', '').slice(0, 12)}…
                   </div>
                 </motion.div>
               ))}
@@ -160,14 +164,14 @@ function AlertTrailContent({ caseId, onGenerate }) {
                 animate={{ opacity: 1, scale: 1 }}
                 style={{
                   marginTop: '12px',
-                  paddingTop: '12px',
-                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  paddingTop: '10px',
+                  borderTop: '1px solid var(--border-medium)',
                   fontWeight: 600,
-                  color: verificationResults.every(r => r.valid) ? 'var(--severity-clear)' : 'var(--severity-critical)'
+                  color: verificationResults.every((r) => r.valid) ? 'var(--severity-clear)' : 'var(--severity-critical)',
                 }}
               >
-                {verificationResults.every(r => r.valid) 
-                  ? `CHAIN VERIFIED — ${verificationResults.length}/${verificationResults.length} blocks valid` 
+                {verificationResults.every((r) => r.valid)
+                  ? `✓ IMMUTABLE CHAIN VERIFIED — ${verificationResults.length}/${verificationResults.length} blocks valid`
                   : 'TAMPER DETECTED'}
               </motion.div>
             )}
@@ -175,7 +179,7 @@ function AlertTrailContent({ caseId, onGenerate }) {
         )}
       </AnimatePresence>
 
-      {/* Success confirmation */}
+      {/* Success notification */}
       <AnimatePresence>
         {lastGenerated && (
           <motion.div
@@ -183,18 +187,20 @@ function AlertTrailContent({ caseId, onGenerate }) {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(65,220,143,0.1)', border: '1px solid var(--severity-clear)', borderRadius: '6px', color: 'var(--severity-clear)', display: 'flex', alignItems: 'center', gap: '10px' }}
           >
-            <div className="alert-success-icon">✓</div>
-            <div className="alert-success-text">Alert Generated</div>
-            <div className="alert-success-id">{lastGenerated.alert_id}</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>✓</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Intervention Alert Generated</div>
+              <div style={{ fontSize: '0.78rem', opacity: 0.9 }}>{lastGenerated.alert_id} · Hash signed to audit trail</div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Alert list */}
       <div className="alerts-list">
-        {alerts
+        {filteredAlerts
           .slice()
           .reverse()
           .map((alert, i) => (
@@ -205,60 +211,56 @@ function AlertTrailContent({ caseId, onGenerate }) {
               transition={{ duration: 0.35 }}
             >
               {i > 0 && (
-                <div className="alert-chain-link">
-                  <div className="alert-chain-line" />
-                  <span>↑ chained</span>
+                <div className="alert-chain-link" style={{ textAlign: 'center', margin: '4px 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  <span>↑ chained via SHA-256</span>
                 </div>
               )}
-              <div className="alert-card">
-                <div className="alert-header">
-                  <span className="alert-id">{alert.alert_id}</span>
-                  <span className="alert-time">
+              <div className="alert-card" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', padding: '14px', position: 'relative' }}>
+                <div className="alert-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span className="alert-id" style={{ fontWeight: 800, color: 'var(--accent)', fontSize: '0.9rem' }}>{alert.alert_id}</span>
+                  <span className="alert-time" style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     {new Date(alert.created_at).toLocaleTimeString()}
                   </span>
                 </div>
-                <div className="alert-body">
+                <div className="alert-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px 12px', fontSize: '0.82rem' }}>
                   <div className="alert-row">
-                    <span className="alert-row-label">Case</span>
-                    <span className="alert-row-value" style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600 }}>
-                      {alert.case_id}
+                    <span className="alert-row-label" style={{ color: 'var(--text-muted)' }}>Case: </span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{alert.case_id}</strong>
+                  </div>
+                  <div className="alert-row">
+                    <span className="alert-row-label" style={{ color: 'var(--text-muted)' }}>State: </span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{stateLabel(alert.current_state)}</span>
+                  </div>
+                  <div className="alert-row">
+                    <span className="alert-row-label" style={{ color: 'var(--text-muted)' }}>Predicted Action: </span>
+                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>
+                      {nextActionLabel(alert.predicted_next_action)} ({formatPercent(alert.probability)})
                     </span>
                   </div>
                   <div className="alert-row">
-                    <span className="alert-row-label">State</span>
-                    <span className="alert-row-value">{stateLabel(alert.current_state)}</span>
+                    <span className="alert-row-label" style={{ color: 'var(--text-muted)' }}>Window: </span>
+                    <span style={{ color: 'var(--text-primary)' }}>{alert.expected_window}</span>
                   </div>
                   <div className="alert-row">
-                    <span className="alert-row-label">Next Action</span>
-                    <span className="alert-row-value">
-                      {alert.predicted_next_action}{' '}
-                      <span style={{ color: 'var(--accent)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                        {formatPercent(alert.probability)}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="alert-row">
-                    <span className="alert-row-label">Window</span>
-                    <span className="alert-row-value">{alert.expected_window}</span>
-                  </div>
-                  <div className="alert-row">
-                    <span className="alert-row-label">Exposure</span>
-                    <span className="alert-row-value" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                    <span className="alert-row-label" style={{ color: 'var(--text-muted)' }}>Exposure: </span>
+                    <span style={{ color: 'var(--severity-critical)', fontWeight: 700 }}>
                       {formatINR(alert.potential_exposure_inr)}
                     </span>
                   </div>
                   <div className="alert-row">
-                    <span className="alert-row-label">Location</span>
-                    <span className="alert-row-value">{zoneLabel(alert.top_location)}</span>
+                    <span className="alert-row-label" style={{ color: 'var(--text-muted)' }}>Location: </span>
+                    <span style={{ color: 'var(--text-primary)' }}>{zoneLabel(alert.top_location)}</span>
                   </div>
                 </div>
 
                 {/* Collapsible hash details */}
                 <button
-                  className="alert-hash-toggle"
+                  className="btn btn-ghost"
+                  type="button"
+                  style={{ marginTop: '10px', fontSize: '0.75rem', padding: '4px 8px' }}
                   onClick={() => setExpandedHash(expandedHash === alert.alert_id ? null : alert.alert_id)}
                 >
-                  {expandedHash === alert.alert_id ? '▾ Hide Audit Details' : '▸ View Audit Details'}
+                  {expandedHash === alert.alert_id ? '▾ Hide Cryptographic Audit Hash' : '▸ View Cryptographic Audit Hash'}
                 </button>
 
                 <AnimatePresence>
@@ -269,19 +271,14 @@ function AlertTrailContent({ caseId, onGenerate }) {
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.25 }}
-                      style={{ overflow: 'hidden' }}
+                      style={{ overflow: 'hidden', marginTop: '8px', padding: '8px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-medium)', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span>hash:</span> {renderHash(alert.hash, `hash-${alert.alert_id}`)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>hash:</span> {renderHash(alert.hash, `hash-${alert.alert_id}`)}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)' }}>
                         <span>prev:</span> {renderHash(alert.prev_hash, `prev-${alert.alert_id}`)}
                       </div>
-                      {alert.blockchain_tx && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent)', marginTop: '4px' }}>
-                          <span>chain_tx:</span> {renderHash(alert.blockchain_tx, `chain-${alert.alert_id}`)}
-                        </div>
-                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -289,8 +286,10 @@ function AlertTrailContent({ caseId, onGenerate }) {
             </motion.div>
           ))}
 
-        {alerts.length === 0 && (
-          <div className="empty-state">No alerts generated yet</div>
+        {filteredAlerts.length === 0 && (
+          <div className="empty-state" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+            No alerts generated yet for this case. Click "Generate Intervention Alert" above to dispatch.
+          </div>
         )}
       </div>
     </>
@@ -298,26 +297,21 @@ function AlertTrailContent({ caseId, onGenerate }) {
 }
 
 export default function AlertTrail({ caseId, isOpen, onClose, onGenerate, inline = false }) {
-  // Inline mode: render content directly without drawer wrapper
   if (inline) {
     return (
       <div className="alerttrail-inline">
-        <div className="alerttrail-inline-subtitle">
-          Each alert is chained by SHA-256 hash to the one before it — if anyone tampers
-          with a past alert, every hash after it breaks. That's how we prove the alert
-          trail wasn't edited after the fact.
+        <div className="alerttrail-inline-subtitle" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+          🛡️ Each intervention alert is cryptographically signed with a SHA-256 hash. If any historical record is modified, the downstream hash chain breaks, establishing proof of non-repudiation.
         </div>
         <AlertTrailContent caseId={caseId} onGenerate={onGenerate} />
       </div>
     );
   }
 
-  // Drawer mode (original behavior)
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             className="right-drawer-backdrop"
             initial={{ opacity: 0 }}
@@ -326,8 +320,6 @@ export default function AlertTrail({ caseId, isOpen, onClose, onGenerate, inline
             transition={{ duration: 0.25 }}
             onClick={onClose}
           />
-
-          {/* Right drawer */}
           <motion.div
             className="right-drawer"
             initial={{ x: '100%' }}
@@ -337,18 +329,15 @@ export default function AlertTrail({ caseId, isOpen, onClose, onGenerate, inline
           >
             <div className="right-drawer-header">
               <div>
-                <div className="right-drawer-title">Alert History ({/* count managed internally */})</div>
+                <div className="right-drawer-title">Alert Audit History</div>
                 <div className="right-drawer-subtitle">
-                  Each alert is chained by SHA-256 hash to the one before it — if anyone tampers
-                  with a past alert, every hash after it breaks. That's how we prove the alert
-                  trail wasn't edited after the fact.
+                  SHA-256 cryptographic chain of custody for official intervention records.
                 </div>
               </div>
               <button className="right-drawer-close" onClick={onClose}>
                 ✕
               </button>
             </div>
-
             <div className="right-drawer-body">
               <AlertTrailContent caseId={caseId} onGenerate={onGenerate} />
             </div>

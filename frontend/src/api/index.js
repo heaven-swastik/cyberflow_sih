@@ -59,6 +59,55 @@ export async function getCases() {
   return fetchJSON('/cases');
 }
 
+// Zone reference metadata mirrors backend/server.js ZONE_HUBS. Kept in
+// sync manually since this is a small static prototype constant, not
+// live data — see server.js comment above the /api/macro/heatmap route.
+const ZONE_HUBS = {
+  zone_a: { lat: 28.6139, lng: 77.2090, city: 'Delhi NCR', label: 'Zone A (Delhi Hub)', jurisdiction: 'Delhi Police Cyber Cell (IFSO)', state: 'Delhi' },
+  zone_b: { lat: 22.5726, lng: 88.3639, city: 'Kolkata', label: 'Zone B (Kolkata Hub)', jurisdiction: 'Kolkata Police Cyber Crime PS', state: 'West Bengal' },
+  zone_c: { lat: 19.0760, lng: 72.8777, city: 'Mumbai', label: 'Zone C (Mumbai Hub)', jurisdiction: 'Mumbai Cyber Crime Investigation Cell', state: 'Maharashtra' },
+};
+
+export async function getMacroHeatmap({ crimeCategory = 'all', timeWindow = 'all' } = {}) {
+  if (USE_MOCK) {
+    await delay();
+    const cases = mockData.cases || [];
+    const byZone = {};
+    for (const zoneId of Object.keys(ZONE_HUBS)) {
+      byZone[zoneId] = { zone_id: zoneId, ...ZONE_HUBS[zoneId], case_count: 0, high_priority_count: 0, total_exposure_inr: 0, case_ids: [], _confSum: 0 };
+    }
+    for (const c of cases) {
+      if (crimeCategory !== 'all' && c.fraud_type !== crimeCategory) continue;
+      const topLoc = (c.location_candidates || [])[0];
+      if (!topLoc || !byZone[topLoc.zone_id]) continue;
+      const z = byZone[topLoc.zone_id];
+      z.case_count += 1;
+      if (c.intervention_priority === 'HIGH') z.high_priority_count += 1;
+      z.total_exposure_inr += (c.potential_exposure_inr || 0);
+      z._confSum += topLoc.confidence || 0;
+      z.case_ids.push(c.case_id);
+    }
+    const zones = Object.values(byZone).map((z) => {
+      const avg_confidence = z.case_count > 0 ? Math.round((z._confSum / z.case_count) * 100) / 100 : 0;
+      delete z._confSum;
+      const real_time_risk = z.case_count === 0 ? 'none' : (z.high_priority_count > 0 ? 'critical' : 'elevated');
+      const potential_risk = avg_confidence >= 0.7 ? 'high' : avg_confidence >= 0.4 ? 'medium' : 'low';
+      return { ...z, avg_confidence, real_time_risk, potential_risk };
+    });
+    return {
+      generated_at: new Date().toISOString(),
+      filters_applied: { crime_category: crimeCategory, time_window: timeWindow },
+      total_cases_considered: cases.length,
+      zones,
+    };
+  }
+  const qs = new URLSearchParams();
+  if (crimeCategory && crimeCategory !== 'all') qs.set('crime_category', crimeCategory);
+  if (timeWindow && timeWindow !== 'all') qs.set('time_window', timeWindow);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return fetchJSON(`/macro/heatmap${suffix}`);
+}
+
 export async function getCase(caseId) {
   if (USE_MOCK) {
     await delay();
@@ -139,6 +188,19 @@ export async function generateAlert(caseId) {
       mockAlerts.length > 0
         ? mockAlerts[mockAlerts.length - 1].hash
         : 'sha256:0000000000000000000000000000000000000000000000000000000000000000';
+    const topZoneId = c.location_candidates?.[0]?.zone_id || 'zone_a';
+    const topAtm = c.atm_candidates?.[0];
+    const zoneHub = ZONE_HUBS[topZoneId];
+    // Mirror backend/server.js's channels shape so the notification panel
+    // renders the same way in mock and live mode (previously mock alerts
+    // had no `channels` field at all, so the panel had nothing to show).
+    const channels = [
+      { recipient: zoneHub?.jurisdiction || 'Cyber Cell (zone unresolved)', role: 'LEA (responding jurisdiction)', channel: 'dashboard', status: 'simulated' },
+      { recipient: zoneHub?.jurisdiction || 'Cyber Cell (zone unresolved)', role: 'LEA (responding jurisdiction)', channel: 'sms', status: 'simulated' },
+      { recipient: 'Originating IO — Not specified at intake', role: 'LEA (originating officer)', channel: 'email', status: 'simulated' },
+      { recipient: topAtm?.bank_name ? `${topAtm.bank_name} Fraud Ops` : 'Bank Fraud Ops', role: 'Bank/FI', channel: 'api', status: 'simulated' },
+      { recipient: 'I4C National Coordination Desk', role: 'I4C', channel: 'dashboard', status: 'simulated' },
+    ];
     const newAlert = {
       alert_id: `ALT-${String(alertCounter).padStart(4, '0')}`,
       case_id: caseId,
@@ -147,9 +209,13 @@ export async function generateAlert(caseId) {
       predicted_next_action: c.next_action.predicted,
       probability: c.next_action.probabilities[c.next_action.predicted],
       expected_window: `${new Date().getHours()}:${String(new Date().getMinutes()).padStart(2, '0')}-${new Date().getHours()}:${String(new Date().getMinutes() + 20).padStart(2, '0')}`,
-      top_location: c.location_candidates[0]?.zone_id || 'zone_a',
+      top_location: topZoneId,
+      predicted_atm_id: topAtm?.atm_id || null,
+      predicted_atm_bank: topAtm?.bank_name || null,
+      predicted_atm_address: topAtm?.address || null,
       potential_exposure_inr: c.potential_exposure_inr,
       intervention_priority: c.intervention_priority,
+      channels,
       reason: c.explanation.slice(0, 3).join(' + ') + '.',
       hash: `sha256:${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
       prev_hash: prevHash,
@@ -158,6 +224,16 @@ export async function generateAlert(caseId) {
     return newAlert;
   }
   return fetchJSON(`/cases/${caseId}/alert`, { method: 'POST' });
+}
+
+export async function sendIntelligenceAlert(caseId) {
+  if (USE_MOCK) {
+    throw new Error('Email delivery requires the live backend and server-side SMTP configuration.');
+  }
+  return fetchJSON('/intelligence/send-alert', {
+    method: 'POST',
+    body: JSON.stringify({ case_id: caseId }),
+  });
 }
 
 export async function getAlerts() {

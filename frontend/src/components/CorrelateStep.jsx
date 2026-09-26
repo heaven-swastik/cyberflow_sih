@@ -60,7 +60,7 @@ const CorrelateStep = ({
      await new Promise(r => setTimeout(r, 2500));
      
      try {
-       const token = localStorage.getItem('token');
+       const token = localStorage.getItem('cyberflow_token');
        await fetch(`/api/cases/${caseId}/verify-evidence`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

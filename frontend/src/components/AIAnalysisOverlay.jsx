@@ -119,11 +119,11 @@ const AIAnalysisOverlay = ({ onComplete }) => {
                 [{log.time}]
               </span>
               <span style={{ 
-                color: log.text.includes('[SYS]') ? '#0066cc' : 
-                       log.text.includes('[ML_MODEL]') ? '#d73a49' : 
-                       log.text.includes('[GRAPH]') ? '#6f42c1' :
-                       log.text.includes('[RL_AGENT]') ? '#e36209' : '#24292e',
-                fontWeight: log.text.includes('[') ? 600 : 400
+                color: (log.text || "").includes('[SYS]') ? '#0066cc' : 
+                       (log.text || "").includes('[ML_MODEL]') ? '#d73a49' : 
+                       (log.text || "").includes('[GRAPH]') ? '#6f42c1' :
+                       (log.text || "").includes('[RL_AGENT]') ? '#e36209' : '#24292e',
+                fontWeight: (log.text || "").includes('[') ? 600 : 400
               }}>
                 {log.text}
               </span>

@@ -10,10 +10,11 @@ const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: '*',
   methods: ['GET', 'POST', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
@@ -474,7 +475,7 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
   // This prototype does not call a real SMS gateway or bank API — every
   // channel entry is explicitly marked "simulated" rather than silently
   // implying delivery, per the honest-labeling pattern used throughout
-  // this codebase (see SIH_PITCH.md "Implemented vs future work").
+  // this codebase (see README.md "Demo Limitations").
   const channels = [
     { recipient: predictedJurisdiction, role: 'LEA (responding jurisdiction)', channel: 'dashboard', status: 'simulated' },
     { recipient: predictedJurisdiction, role: 'LEA (responding jurisdiction)', channel: 'sms', status: 'simulated' },
@@ -519,6 +520,7 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
   // Persistence
   try {
     fs.writeFileSync('./case_export.json', JSON.stringify(data, null, 2));
+      fs.writeFileSync('../ai-engine/case_export.json', JSON.stringify(data, null, 2));
     const { execSync } = require('child_process');
     execSync('python ../ai-engine/db/build_db.py');
     execSync('cp ../ai-engine/db/cyberflow.db ./db/cyberflow.db || copy ..\\ai-engine\\db\\cyberflow.db .\\db\\cyberflow.db');
@@ -532,6 +534,92 @@ app.post('/api/cases/:case_id/alert', authenticateToken, requireRole('admin', 'o
 app.get('/api/alerts', authenticateToken, requireRole('admin', 'officer'), (req, res) => {
   res.json(data.alerts || []);
 });
+
+app.post('/api/intelligence/send-alert',
+  authenticateToken,
+  requireRole('admin', 'officer'),
+  body('case_id').isString().trim().isLength({ min: 1, max: 80 }),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'A valid case_id is required.' });
+
+    const c = (data.cases || []).find((item) => item.case_id === req.body.case_id);
+    if (!c) return res.status(404).json({ error: 'Case not found.' });
+
+    const { SMTP_USER, SMTP_APP_PASSWORD, ALERT_RECIPIENT } = process.env;
+    if (!SMTP_USER || !SMTP_APP_PASSWORD || !ALERT_RECIPIENT) {
+      return res.json({
+        status: 'sent',
+        sent_at: sentAt,
+        case_id: c.case_id,
+        simulated: true,
+        message: 'Intelligence brief simulated delivery confirmed.',
+      });
+    }
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[character]);
+    const topAtms = (c.atm_candidates || []).slice(0, 3);
+    const topZone = c.location_candidates?.[0];
+    const predictedAction = c.next_action?.predicted || 'Not available';
+    const confidence = c.next_action?.probabilities?.[predictedAction];
+    const windowRange = c.expected_time_window_minutes;
+    const expectedWindow = Array.isArray(windowRange) ? `${windowRange[0]}–${windowRange[1]} minutes` : 'Not available';
+    const evidence = (c.explanation || []).slice(0, 8);
+    const recommendations = [
+      `Review the linked transaction chain in ${topZone?.zone_id || 'the predicted zone'}.`,
+      `Ask ${topAtms[0]?.bank_name || 'the relevant bank'} to review associated account activity through authorized channels.`,
+      topAtms[0]?.address ? `Verify the candidate ATM cluster near ${topAtms[0].address}.` : 'Review candidate ATM locations before field escalation.',
+      'Review the evidence before authorizing financial or field actions.',
+    ];
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
+    const sentAt = new Date().toISOString();
+    const candidateText = topAtms.length
+      ? topAtms.map((atm, index) => `${index + 1}. ${atm.atm_id || 'ATM ID unavailable'} | ${atm.bank_name || 'Bank unavailable'} | ${atm.address || 'Location unavailable'} | score ${atm.confidence == null ? 'not supplied' : `${(Number(atm.confidence) * 100).toFixed(1)}%`} | ${atm.reasoning || 'No supporting reason recorded'}`).join('\n')
+      : 'No ATM candidates recorded.';
+    const text = [
+      `CyberFlow intelligence alert — ${c.case_id}`,
+      `Timestamp: ${sentAt}`,
+      `Incident summary: ${c.complaint?.description || 'Not available'}`,
+      `Prediction: ${predictedAction.replace(/_/g, ' ')}`,
+      `Confidence: ${confidence == null ? 'Not available' : `${(Number(confidence) * 100).toFixed(1)}%`}`,
+      `Risk level: ${c.intervention_priority || 'Not assessed'}`,
+      `Risk zone: ${topZone?.zone_id || 'Not available'}`,
+      `Expected window: ${expectedWindow}`,
+      `Top ATM candidates:\n${candidateText}`,
+      `Evidence summary:\n${evidence.length ? evidence.map((item) => `- ${item}`).join('\n') : '- No case explanation recorded.'}`,
+      `Recommended zone actions (investigator review required):\n${recommendations.map((item) => `- ${item}`).join('\n')}`,
+      'These are probabilistic recommendations, not confirmed events or automatic financial actions.',
+      `Open CyberFlow: ${appUrl}`,
+      `Case reference: ${c.case_id}`,
+    ].join('\n\n');
+    const htmlList = (items) => items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<p>Not available.</p>';
+    const atmHtml = topAtms.length
+      ? `<ol>${topAtms.map((atm) => `<li><strong>${escapeHtml(atm.atm_id || 'ATM ID unavailable')}</strong> · ${escapeHtml(atm.bank_name || 'Bank unavailable')} · ${escapeHtml(atm.address || 'Location unavailable')} · score ${atm.confidence == null ? 'not supplied' : `${(Number(atm.confidence) * 100).toFixed(1)}%`}<br>${escapeHtml(atm.reasoning || 'No supporting reason recorded')}</li>`).join('')}</ol>`
+      : '<p>No ATM candidates recorded.</p>';
+    const html = `<div style="font-family:Arial,sans-serif;max-width:720px;color:#302b43;line-height:1.55"><p style="color:#6752a3;font-weight:bold">CYBERFLOW INTELLIGENCE ALERT</p><h1 style="font-size:22px">${escapeHtml(c.case_id)}</h1><p><strong>Timestamp:</strong> ${escapeHtml(sentAt)}<br><strong>Risk:</strong> ${escapeHtml(c.intervention_priority || 'Not assessed')}<br><strong>Zone:</strong> ${escapeHtml(topZone?.zone_id || 'Not available')}<br><strong>Expected window:</strong> ${escapeHtml(expectedWindow)}</p><h2>Incident summary</h2><p>${escapeHtml(c.complaint?.description || 'Not available')}</p><h2>Prediction</h2><p>${escapeHtml(predictedAction.replace(/_/g, ' '))} · ${confidence == null ? 'Confidence not available' : `${(Number(confidence) * 100).toFixed(1)}% confidence`}</p><h2>Top ATM candidates</h2>${atmHtml}<h2>Evidence summary</h2>${htmlList(evidence)}<h2>Recommended zone actions</h2>${htmlList(recommendations)}<p><strong>Human review required.</strong> Scores are estimates; no financial action is automatically performed.</p><p><a href="${escapeHtml(appUrl)}">Open CyberFlow</a><br>Case reference: ${escapeHtml(c.case_id)}</p></div>`;
+
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: SMTP_USER, pass: SMTP_APP_PASSWORD },
+      });
+      const targetRecipient = req.body.officer_emails || req.body.recipient_email || ALERT_RECIPIENT;
+      await transporter.sendMail({
+        from: SMTP_USER,
+        to: targetRecipient,
+        subject: `CyberFlow intelligence alert — ${c.case_id}`,
+        text,
+        html,
+      });
+      return res.json({ status: 'sent', sent_at: sentAt, case_id: c.case_id, recipient: targetRecipient });
+    } catch (error) {
+      console.error('Intelligence email delivery failed:', error?.code || error?.name || 'mail transport error');
+      return res.status(502).json({ error: 'Email delivery failed. Check the server mail configuration and try again.' });
+    }
+  }
+);
 
 // ── Investigator verification / feedback loop ──
 // Lets an investigator record whether a predicted zone/ATM actually
@@ -774,6 +862,7 @@ app.post('/api/complaints',
   // Persist to JSON
   try {
     fs.writeFileSync('./case_export.json', JSON.stringify(data, null, 2));
+      fs.writeFileSync('../ai-engine/case_export.json', JSON.stringify(data, null, 2));
   } catch(e) {
     console.error('Failed to save to case_export.json', e);
   }

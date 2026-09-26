@@ -16,7 +16,7 @@ import WizardProgressBar from './components/WizardProgressBar';
 import WizardNavigation from './components/WizardNavigation';
 import IncidentStep from './components/IncidentStep';
 import CorrelateStep from './components/CorrelateStep';
-import PredictionStep from './components/PredictionStep';
+import PredictionCommandCenter from './components/PredictionCommandCenter';
 import MapStep from './components/MapStep';
 import ActionStep from './components/ActionStep';
 import SimulationRunner from './components/SimulationRunner';
@@ -35,6 +35,8 @@ function AppContent() {
   const [view, setView] = useState('landing');
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [caseData, setCaseData] = useState(null);
+  const [caseLoadError, setCaseLoadError] = useState('');
+  const [caseLoadAttempt, setCaseLoadAttempt] = useState(0);
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1);
@@ -75,14 +77,28 @@ function AppContent() {
   // Load full case data when selection changes
   useEffect(() => {
     if (!selectedCaseId) return;
+    let isCurrentRequest = true;
     setCaseData(null);
+    setCaseLoadError('');
     setSimZone(null);
     setDbExpanded(false);
     setAutoPlayTimeline(false);
     setCompletedSteps(new Set());
     setCurrentStep(1);
-    getCase(selectedCaseId).then(setCaseData);
-  }, [selectedCaseId]);
+    getCase(selectedCaseId)
+      .then((data) => {
+        if (isCurrentRequest) setCaseData(data);
+      })
+      .catch((error) => {
+        if (isCurrentRequest) {
+          setCaseLoadError(error.message || 'The investigation data could not be loaded.');
+        }
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [selectedCaseId, caseLoadAttempt]);
 
   // Once case data has loaded for a pending simulation, start playback
   useEffect(() => {
@@ -219,7 +235,7 @@ function AppContent() {
           />
         );
       case 3:
-        return <PredictionStep caseData={caseData} />;
+        return <PredictionCommandCenter caseData={caseData} />;
       case 4:
         return (
           <MapStep
@@ -276,7 +292,7 @@ function AppContent() {
         onOpenComplaintPortal={() => setShowComplaintPortal(true)}
         onOpenApiIntegration={() => setShowApiIntegration(true)}
         onOpenAdminPanel={() => setShowAdminPanel(true)}
-          onOpenMacroHeatmap={() => setShowMacroHeatmap(true)}
+        onOpenMacroHeatmap={() => setShowMacroHeatmap(true)}
         onOpenComplaintTracker={() => setShowComplaintTracker(true)}
         onLogin={() => setView('login')}
         onLogout={logout}
@@ -438,19 +454,34 @@ function AppContent() {
 
             {/* Step content */}
             <div className="wizard-step-container">
-              <AnimatePresence mode="wait">
-
-                <motion.div
-                  key={currentStep}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -16 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="wizard-step-content"
-                >
-                  {renderCurrentStep()}
-                </motion.div>
-              </AnimatePresence>
+              {caseLoadError ? (
+                <section className="case-load-error" role="alert">
+                  <span className="case-load-error-kicker">INVESTIGATION UNAVAILABLE</span>
+                  <h2>Could not load this case</h2>
+                  <p>{caseLoadError}</p>
+                  <div className="case-load-error-actions">
+                    <button className="btn btn-primary" onClick={() => setCaseLoadAttempt((attempt) => attempt + 1)}>
+                      Retry loading
+                    </button>
+                    <button className="btn btn-ghost" onClick={goBackToLanding}>
+                      Return to dashboard
+                    </button>
+                  </div>
+                </section>
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentStep}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -16 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="wizard-step-content"
+                  >
+                    {renderCurrentStep()}
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </div>
 
             {/* Wizard Navigation (Back / Next) */}
