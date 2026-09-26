@@ -5,7 +5,12 @@ import { getMyCases } from '../api';
 
 const priorityColor = (p) => (p === 'HIGH' ? '#e4483f' : p === 'MEDIUM' ? '#e2954a' : '#41dc8f');
 
-const statusLabel = (caseItem) => caseItem.prediction_outcome?.status === 'confirmed_correct' ? 'Solved' : 'Pending';
+const statusLabel = (caseItem) => {
+  if (caseItem.status === 'completed' || caseItem.status === 'resolved' || caseItem.prediction_outcome?.status === 'confirmed_correct') {
+    return 'Completed';
+  }
+  return 'Pending';
+};
 
 export default function ComplainantDashboard({ onFileComplaint }) {
   const { user } = useAuth();
@@ -21,7 +26,7 @@ export default function ComplainantDashboard({ onFileComplaint }) {
   const stats = useMemo(() => {
     const total = cases.length;
     const pending = cases.filter((c) => statusLabel(c) === 'Pending').length;
-    const solved = cases.filter((c) => statusLabel(c) === 'Solved').length;
+    const solved = cases.filter((c) => statusLabel(c) === 'Completed').length;
     return { total, pending, solved };
   }, [cases]);
 
@@ -58,38 +63,58 @@ export default function ComplainantDashboard({ onFileComplaint }) {
           {/* ── Left: case list ── */}
           <div className="dashboard-main">
             <div className="complainant-case-list">
-              {cases.map((c, i) => (
-                <motion.div
-                  key={c.case_id || i}
-                  className="complainant-case-card"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                >
-                  <div className="complainant-case-card-top">
-                    <div className="complainant-case-id-row">
-                      <span className="complainant-case-id">{c.case_id}</span>
-                      
+              {cases.map((c, i) => {
+                const isCompleted = statusLabel(c) === 'Completed';
+                return (
+                  <motion.div
+                    key={c.case_id || i}
+                    className="complainant-case-card"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                  >
+                    <div className="complainant-case-card-top">
+                      <div className="complainant-case-id-row">
+                        <span className="complainant-case-id">{c.case_id}</span>
+                      </div>
+                      <span
+                        className="complainant-case-stage"
+                        style={{
+                          background: isCompleted ? 'rgba(65, 220, 143, 0.15)' : 'rgba(226, 149, 74, 0.15)',
+                          color: isCompleted ? '#41dc8f' : '#e2954a',
+                          border: `1px solid ${isCompleted ? 'rgba(65, 220, 143, 0.3)' : 'rgba(226, 149, 74, 0.3)'}`,
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {isCompleted ? '✓ Completed' : '⏳ Pending'}
+                      </span>
                     </div>
-                    <span className="complainant-case-stage">{statusLabel(c)}</span>
-                  </div>
 
-                  <div className="complainant-case-metrics">
-                    <div className="complainant-case-metric">
-                      <div className="complainant-case-metric-label">Fraud Type</div>
-                      <div className="complainant-case-metric-value">{(c.fraud_type || 'Unknown').replace(/_/g, ' ')}</div>
-                    </div>
-                    
-                    <div className="complainant-case-metric">
-                      <div className="complainant-case-metric-label">Exposure</div>
-                      <div className="complainant-case-metric-value">
-                        {c.potential_exposure_inr ? `₹${(c.potential_exposure_inr / 100000).toFixed(1)}L` : 'N/A'}
+                    <div className="complainant-case-metrics">
+                      <div className="complainant-case-metric">
+                        <div className="complainant-case-metric-label">Fraud Type</div>
+                        <div className="complainant-case-metric-value">{(c.fraud_type || 'Unknown').replace(/_/g, ' ')}</div>
+                      </div>
+                      
+                      <div className="complainant-case-metric">
+                        <div className="complainant-case-metric-label">Exposure</div>
+                        <div className="complainant-case-metric-value">
+                          {c.potential_exposure_inr ? `₹${(c.potential_exposure_inr / 100000).toFixed(1)}L` : 'N/A'}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                </motion.div>
-              ))}
+                    {c.status_updated_at && (
+                      <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#8a9390' }}>
+                        Updated by {c.status_updated_by || 'Officer'} on {new Date(c.status_updated_at).toLocaleDateString()}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
 

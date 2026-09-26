@@ -67,6 +67,17 @@ export default function InvestigationCard({ caseItem: c, index, onSelect }) {
         <span className={`badge badge-priority-${c.intervention_priority}`}>
           {c.intervention_priority}
         </span>
+        <span
+          className="badge"
+          style={{
+            color: c.status === 'completed' || c.status === 'resolved' ? '#41dc8f' : '#e2954a',
+            borderColor: c.status === 'completed' || c.status === 'resolved' ? 'rgba(65, 220, 143, 0.3)' : 'rgba(226, 149, 74, 0.3)',
+            background: c.status === 'completed' || c.status === 'resolved' ? 'rgba(65, 220, 143, 0.12)' : 'rgba(226, 149, 74, 0.12)',
+            fontWeight: 700,
+          }}
+        >
+          {c.status === 'completed' || c.status === 'resolved' ? '✓ COMPLETED' : '⏳ PENDING'}
+        </span>
       </div>
 
       <div className="inv-metrics">

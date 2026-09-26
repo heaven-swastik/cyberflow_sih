@@ -350,7 +350,13 @@ app.get('/api/my-cases', authenticateToken, (req, res) => {
   if (req.user.role !== 'complainant') {
     return res.status(403).json({ error: 'Endpoint only for complainants' });
   }
-  const myCases = (data.cases || []).filter(c => c.complainant_id === req.user.sub);
+  const userEmail = (req.user.email || '').toLowerCase();
+  const userId = req.user.sub;
+  const myCases = (data.cases || []).filter(c => 
+    c.complainant_id === userId || 
+    (c.complainant_email && c.complainant_email.toLowerCase() === userEmail) ||
+    (c.complaint?.complainant_email && c.complaint.complainant_email.toLowerCase() === userEmail)
+  );
   res.json(myCases);
 });
 
@@ -649,6 +655,39 @@ app.patch('/api/cases/:case_id/outcome', authenticateToken, requireRole('admin',
   }
 );
 
+// ── Officer / Admin case completion status update ──
+app.patch('/api/cases/:case_id/status', authenticateToken, requireRole('admin', 'officer'),
+  body('status').isIn(['pending', 'completed', 'resolved']).withMessage('Invalid status'),
+  (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+    }
+    const c = (data.cases || []).find(x => x.case_id === req.params.case_id);
+    if (!c) return res.status(404).json({ error: 'case not found' });
+
+    c.status = req.body.status;
+    c.status_updated_at = new Date().toISOString();
+    c.status_updated_by = req.user.displayName || req.user.email;
+
+    try {
+      fs.writeFileSync('./case_export.json', JSON.stringify(data, null, 2));
+      if (fs.existsSync('../ai-engine')) {
+        fs.writeFileSync('../ai-engine/case_export.json', JSON.stringify(data, null, 2));
+      }
+    } catch(e) {
+      console.error('Failed to save updated case status:', e);
+    }
+
+    res.json({
+      case_id: c.case_id,
+      status: c.status,
+      status_updated_at: c.status_updated_at,
+      status_updated_by: c.status_updated_by
+    });
+  }
+);
+
 // ── Blockchain endpoints ──
 app.get('/api/blockchain', authenticateToken, requireRole('admin'), (req, res) => {
   const result = runBlockchainCli('get_all');
@@ -812,7 +851,9 @@ function generateNodeJsComplaintCase(complaint) {
 
   const newCase = {
     case_id: caseId,
+    status: 'pending',
     complainant_id: complaint._complainant_id || null,
+    complainant_email: complaint._complainant_email || null,
     model_mode: 'ML (XGBoost)',
     fraud_type: fraudType,
     current_state: currentState,
@@ -997,8 +1038,9 @@ app.post('/api/complaints',
     }
     const complaint = req.body || {};
 
-  // Inject the authenticated user's ID so we can enforce ownership later
+  // Inject the authenticated user's ID and email so we can enforce ownership later
   complaint._complainant_id = req.user.sub;
+  complaint._complainant_email = req.user.email;
 
   let parsed;
   const result = await runComplaintIntake(complaint);
@@ -1019,9 +1061,16 @@ app.post('/api/complaints',
     return res.status(400).json(parsed);
   }
 
-  // Stamp ownership on the case object before storing
+  // Stamp ownership and default pending status on the case object before storing
   if (parsed.case) {
     parsed.case.complainant_id = req.user.sub;
+    parsed.case.complainant_email = req.user.email;
+    if (!parsed.case.status) {
+      parsed.case.status = 'pending';
+    }
+    if (parsed.case.complaint) {
+      parsed.case.complaint.complainant_email = req.user.email;
+    }
   }
 
   // Fold the newly-generated case into the in-memory dataset so it

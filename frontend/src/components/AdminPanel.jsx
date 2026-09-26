@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getBlockchainVerify, healBlockchain } from '../api';
+import { getBlockchainVerify, healBlockchain, getCases, updateCaseStatus } from '../api';
 
 const STAT_TILES = [
   { icon: '🗂️', key: 'totalCases', label: 'Total Cases', color: '#5b8fd6' },
@@ -23,19 +23,35 @@ const AdminPanel = ({ onClose, totalCases = 0, totalAlerts = 0 }) => {
   const [chainValid, setChainValid] = useState(true);
   const [healing, setHealing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [allCases, setAllCases] = useState([]);
+  const [loadingCases, setLoadingCases] = useState(false);
 
   useEffect(() => {
     getBlockchainVerify().then(res => setChainValid(res.is_valid !== false)).catch(() => setChainValid(true));
   }, []);
 
-  const handleHeal = async () => {
-    setHealing(true);
-    try { await healBlockchain(); setChainValid(true); } catch(e) { console.error(e); } finally { setHealing(false); }
+  useEffect(() => {
+    if (activeTab === 'cases') {
+      setLoadingCases(true);
+      getCases().then(res => setAllCases(Array.isArray(res) ? res : []))
+        .catch(err => console.error(err))
+        .finally(() => setLoadingCases(false));
+    }
+  }, [activeTab]);
+
+  const handleToggleStatus = async (caseId, currentStatus) => {
+    const nextStatus = (currentStatus === 'completed' || currentStatus === 'resolved') ? 'pending' : 'completed';
+    try {
+      await updateCaseStatus(caseId, nextStatus);
+      setAllCases(prev => prev.map(c => c.case_id === caseId ? { ...c, status: nextStatus } : c));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const statValues = { totalCases, totalAlerts, modelMode: 'XGBoost', uptime: '99.9%' };
 
-  const TABS = ['overview', 'security', 'billing', 'logs'];
+  const TABS = ['overview', 'cases', 'security', 'billing', 'logs'];
 
   return (
     <motion.div
@@ -121,6 +137,53 @@ const AdminPanel = ({ onClose, totalCases = 0, totalAlerts = 0 }) => {
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === 'cases' && (
+          <div style={{ background: '#13231f', border: '1px solid rgba(65,220,143,0.12)', borderRadius: 10, padding: '1rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f4f7f5', marginBottom: '1rem' }}>Registered Cases & Status Control</div>
+            {loadingCases ? (
+              <div style={{ fontSize: '0.8rem', color: '#8a9390', textAlign: 'center', padding: '1rem 0' }}>Loading cases...</div>
+            ) : allCases.length === 0 ? (
+              <div style={{ fontSize: '0.8rem', color: '#8a9390', textAlign: 'center', padding: '1rem 0' }}>No cases found.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {allCases.map((c) => {
+                  const isDone = c.status === 'completed' || c.status === 'resolved';
+                  return (
+                    <div key={c.case_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#050b0a', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 700, color: '#f4f7f5', fontSize: '0.9rem' }}>{c.case_id}</span>
+                          <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: 4, background: isDone ? 'rgba(65,220,143,0.15)' : 'rgba(226,149,74,0.15)', color: isDone ? '#41dc8f' : '#e2954a', fontWeight: 700 }}>
+                            {isDone ? 'COMPLETED' : 'PENDING'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#8a9390', marginTop: 2 }}>
+                          {c.complainant_email || c.complaint?.complainant_email || c.complaint?.complainant_name || 'System / Demo Case'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleToggleStatus(c.case_id, c.status)}
+                        style={{
+                          background: isDone ? '#e2954a' : '#41dc8f',
+                          color: '#0d1715',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '5px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isDone ? 'Reopen' : 'Mark Complete'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'security' && (

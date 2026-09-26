@@ -196,12 +196,12 @@ const LoginPage = ({ onLoginSuccess, onBack }) => {
           <AnimatePresence mode="wait">
             {tab === 'register' && (
               <motion.div key="name" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                <Field label="Full Name" id="displayName" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="User / Complainant Name" error={errors.displayName} />
+                <Field label="Full Name" id="displayName" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="e.g. Rahul Sharma" error={errors.displayName} />
               </motion.div>
             )}
           </AnimatePresence>
 
-          <Field label="Email Address" id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={tab === 'register' ? 'user@example.com' : 'admin@cyberflow.gov.in'} error={errors.email} />
+          <Field label="Email Address" id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={tab === 'register' ? 'user@example.com' : (selectedRole === 'admin' ? 'admin@cyberflow.gov.in' : 'user@example.com')} error={errors.email} />
 
           <Field label={tab === 'signin' ? 'Password' : 'Create Password'} id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" error={errors.password}>
             {tab === 'register' && <PasswordStrength password={password} />}

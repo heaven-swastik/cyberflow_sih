@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import AlertTrail from './AlertTrail';
-import { sendIntelligenceAlert, getAlerts, generateAlert } from '../api';
+import { sendIntelligenceAlert, getAlerts, generateAlert, updateCaseStatus } from '../api';
 import {
   nextActionLabel,
   zoneLabel,
@@ -60,6 +60,26 @@ const ActionStep = ({ caseId, caseData, onAlertGenerated }) => {
   const [emailError, setEmailError] = useState('');
   const [copiedHash, setCopiedHash] = useState(false);
   const [officerEmails, setOfficerEmails] = useState('officer.investigator@cybercell.gov.in, field.desk@i4c.mha.gov.in');
+  const [caseStatus, setCaseStatus] = useState(caseData?.status || 'pending');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    if (caseData?.status) setCaseStatus(caseData.status);
+  }, [caseData?.status]);
+
+  const handleToggleCaseStatus = async () => {
+    const nextStatus = caseStatus === 'completed' ? 'pending' : 'completed';
+    setUpdatingStatus(true);
+    try {
+      await updateCaseStatus(caseId, nextStatus);
+      setCaseStatus(nextStatus);
+      if (caseData) caseData.status = nextStatus;
+    } catch (err) {
+      console.error('Status update failed:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   // Auto-generate hash alert on mount if not yet generated for this case
   useEffect(() => {
@@ -446,6 +466,54 @@ const ActionStep = ({ caseId, caseData, onAlertGenerated }) => {
         <button onClick={handleDownloadReport} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
           🖨️ Print / Save as PDF
         </button>
+      </div>
+
+      {/* Case Resolution & Complainant Status Toggle */}
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>CASE RESOLUTION & COMPLAINANT STATUS CONTROL</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>Case Status:</span>
+              {caseStatus === 'completed' || caseStatus === 'resolved' ? (
+                <span style={{ color: 'var(--severity-clear)', background: 'rgba(65, 220, 143, 0.12)', border: '1px solid var(--severity-clear)', padding: '2px 10px', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  ✓ Completed
+                </span>
+              ) : (
+                <span style={{ color: 'var(--severity-medium)', background: 'rgba(226, 149, 74, 0.12)', border: '1px solid var(--severity-medium)', padding: '2px 10px', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  ⏳ Pending Investigation
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              {caseStatus === 'completed' || caseStatus === 'resolved'
+                ? 'This case is marked complete. When the complainant logs into their portal, their dashboard displays "Completed ✓".'
+                : 'This case is currently pending. The complainant portal displays "Pending ⏳" until an officer marks it complete.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleCaseStatus}
+            disabled={updatingStatus}
+            className="btn btn-primary"
+            style={{
+              background: (caseStatus === 'completed' || caseStatus === 'resolved') ? '#e2954a' : '#41dc8f',
+              color: '#0d1715',
+              border: 'none',
+              padding: '10px 18px',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              borderRadius: '6px',
+            }}
+          >
+            {updatingStatus
+              ? 'Updating Status...'
+              : (caseStatus === 'completed' || caseStatus === 'resolved')
+              ? '↺ Reopen Case (Set Pending)'
+              : '✓ Mark Case Completed'}
+          </button>
+        </div>
       </div>
 
       {/* A. Intelligence Summary — the case-level facts every other panel below drills into */}

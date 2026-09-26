@@ -47,9 +47,35 @@ export async function getOverview() {
 }
 
 export async function getMyCases() {
-  if (USE_MOCK) { await delay(); return []; }
+  if (USE_MOCK) {
+    await delay();
+    const token = localStorage.getItem('cyberflow_token');
+    let userEmail = '';
+    let userId = '';
+    try {
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userEmail = payload.email || '';
+        userId = payload.sub || '';
+      }
+    } catch (_) {}
+
+    const stored = JSON.parse(localStorage.getItem('cyberflow_user_cases') || '[]');
+    const mockCases = (mockData.cases || []).filter((c) =>
+      (userId && c.complainant_id === userId) ||
+      (userEmail && (c.complainant_email === userEmail || c.complaint?.complainant_email === userEmail))
+    );
+    const combined = [...mockCases];
+    for (const sc of stored) {
+      if (!combined.some((c) => c.case_id === sc.case_id)) {
+        combined.push(sc);
+      }
+    }
+    return combined;
+  }
   return fetchJSON('/my-cases');
 }
+
 
 export async function getCases() {
   if (USE_MOCK) {
@@ -332,6 +358,30 @@ export async function submitComplaint(complaint) {
   }
   return fetchJSON('/complaints', { method: 'POST', body: JSON.stringify(complaint) });
 }
+
+export async function updateCaseStatus(caseId, status) {
+  if (USE_MOCK) {
+    await delay(200);
+    const c = mockData.cases.find((x) => x.case_id === caseId);
+    if (c) {
+      c.status = status;
+      c.status_updated_at = new Date().toISOString();
+    }
+    const stored = JSON.parse(localStorage.getItem('cyberflow_user_cases') || '[]');
+    const item = stored.find((x) => x.case_id === caseId);
+    if (item) {
+      item.status = status;
+      item.status_updated_at = new Date().toISOString();
+      localStorage.setItem('cyberflow_user_cases', JSON.stringify(stored));
+    }
+    return { case_id: caseId, status };
+  }
+  return fetchJSON(`/cases/${caseId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
 
 // --------------- API Integration demo (requirement 2) ---------------
 
