@@ -173,6 +173,12 @@ const LoginPage = ({ onLoginSuccess, onBack }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {tab === 'register' && (
+            <div style={{ padding: '8px 12px', background: '#f0f4ff', border: '1px solid #c7d2fe', borderRadius: 10, fontSize: '0.78rem', color: '#4338ca', fontWeight: 500, marginBottom: '4px' }}>
+              ℹ️ Registration creates a <strong>User / Complainant</strong> account. Administrator accounts are pre-registered and must sign in via the Sign In tab.
+            </div>
+          )}
+
           {tab === 'signin' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-role" style={{ fontSize: '0.8rem', color: '#718096', fontWeight: 600 }}>Sign in as</label>
@@ -190,12 +196,12 @@ const LoginPage = ({ onLoginSuccess, onBack }) => {
           <AnimatePresence mode="wait">
             {tab === 'register' && (
               <motion.div key="name" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                <Field label="Full Name" id="displayName" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Investigator Name" error={errors.displayName} />
+                <Field label="Full Name" id="displayName" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="User / Complainant Name" error={errors.displayName} />
               </motion.div>
             )}
           </AnimatePresence>
 
-          <Field label="Email Address" id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="officer@cyberflow.gov.in" error={errors.email} />
+          <Field label="Email Address" id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={tab === 'register' ? 'user@example.com' : 'admin@cyberflow.gov.in'} error={errors.email} />
 
           <Field label={tab === 'signin' ? 'Password' : 'Create Password'} id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" error={errors.password}>
             {tab === 'register' && <PasswordStrength password={password} />}
