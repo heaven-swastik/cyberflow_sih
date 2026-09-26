@@ -394,7 +394,10 @@ function AppContent() {
               </>
             )}
             {isAuthenticated && isComplainant && (
-              <ComplainantDashboard onFileComplaint={() => setShowComplaintPortal(true)} />
+              <ComplainantDashboard
+                onFileComplaint={() => setShowComplaintPortal(true)}
+                onSelectCase={openCase}
+              />
             )}
             {!isAuthenticated && (
               <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
