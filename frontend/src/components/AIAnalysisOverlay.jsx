@@ -39,6 +39,7 @@ const AIAnalysisOverlay = ({ onComplete }) => {
   useEffect(() => {
     let currentLog = 0;
     
+    // Fast terminal log stream for officer case workspace transition (~2.9s duration)
     const logInterval = setInterval(() => {
       if (currentLog < MOCK_LOGS.length) {
         const timeStr = getFormattedTime();
@@ -47,9 +48,9 @@ const AIAnalysisOverlay = ({ onComplete }) => {
         currentLog++;
       } else {
         clearInterval(logInterval);
-        setTimeout(onComplete, 800);
+        setTimeout(onComplete, 400);
       }
-    }, 280); 
+    }, 110); 
 
     return () => clearInterval(logInterval);
   }, [onComplete]);
