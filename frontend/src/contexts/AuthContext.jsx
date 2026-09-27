@@ -24,19 +24,37 @@ const TOKEN_KEY = 'cyberflow_token';
 const USER_KEY = 'cyberflow_user';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem(USER_KEY) || 'null'));
-  const [role, setRole] = useState(() => JSON.parse(localStorage.getItem(USER_KEY) || 'null')?.role || null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    } catch {
+      return null;
+    }
+  });
+  const [role, setRole] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(USER_KEY) || 'null')?.role || null;
+    } catch {
+      return null;
+    }
+  });
+  // Set loading to false by default so app renders instantly without blocking on network round-trip
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
       setUser(null);
       setRole(null);
-      setLoading(false);
       return;
     }
-    fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+    fetch(`${API_BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal
+    })
       .then((response) => {
         if (!response.ok) throw new Error('Session expired');
         return response.json();
@@ -46,13 +64,15 @@ export function AuthProvider({ children }) {
         setRole(currentUser.role);
         localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
       })
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        setUser(null);
-        setRole(null);
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setUser(null);
+          setRole(null);
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => clearTimeout(timeoutId));
   }, []);
 
   // ── Auth actions ──
