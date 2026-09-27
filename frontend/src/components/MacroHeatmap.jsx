@@ -98,25 +98,30 @@ export default function MacroHeatmap({ onClose, onOpenCase }) {
 
       const el = document.createElement('div');
       el.className = 'macro-map-marker';
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.borderRadius = '50%';
-      el.style.background = `${color}33`;
-      el.style.border = `2.5px solid ${color}`;
-      el.style.display = 'flex';
-      el.style.flexDirection = 'column';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'center';
-      el.style.color = '#ffffff';
-      el.style.fontWeight = '800';
-      el.style.fontSize = '0.85rem';
-      el.style.cursor = 'pointer';
-      el.style.boxShadow = `0 0 18px ${color}77, inset 0 0 8px ${color}33`;
-      el.style.transition = 'transform 0.2s ease';
-      el.innerHTML = `<span style="text-shadow: 0 1px 3px rgba(0,0,0,0.9)">${z.case_count}</span><small style="font-size:0.55rem;opacity:0.9;text-shadow: 0 1px 3px rgba(0,0,0,0.9)">CASES</small>`;
 
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.15)'; });
-      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; });
+      const innerEl = document.createElement('div');
+      innerEl.className = 'macro-map-marker-inner';
+      innerEl.style.width = `${size}px`;
+      innerEl.style.height = `${size}px`;
+      innerEl.style.borderRadius = '50%';
+      innerEl.style.background = `${color}33`;
+      innerEl.style.border = `2.5px solid ${color}`;
+      innerEl.style.display = 'flex';
+      innerEl.style.flexDirection = 'column';
+      innerEl.style.alignItems = 'center';
+      innerEl.style.justifyContent = 'center';
+      innerEl.style.color = '#ffffff';
+      innerEl.style.fontWeight = '800';
+      innerEl.style.fontSize = '0.85rem';
+      innerEl.style.cursor = 'pointer';
+      innerEl.style.boxShadow = `0 0 18px ${color}77, inset 0 0 8px ${color}33`;
+      innerEl.style.transition = 'transform 0.2s ease';
+      innerEl.innerHTML = `<span style="text-shadow: 0 1px 3px rgba(0,0,0,0.9)">${z.case_count}</span><small style="font-size:0.55rem;opacity:0.9;text-shadow: 0 1px 3px rgba(0,0,0,0.9)">CASES</small>`;
+
+      innerEl.addEventListener('mouseenter', () => { innerEl.style.transform = 'scale(1.15)'; });
+      innerEl.addEventListener('mouseleave', () => { innerEl.style.transform = 'scale(1)'; });
+
+      el.appendChild(innerEl);
 
       const popupHtml = `
         <div style="font-family: inherit; min-width: 220px; color: var(--text-primary, #0f172a); padding: 4px;">
