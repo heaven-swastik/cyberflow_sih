@@ -22,7 +22,7 @@ Inspectors and judges can instantly log in to the administrative command portal 
 | 📧 **Email** | `admin@cyberflow.gov.in` |
 | 🔑 **Password** | `zOSVWqn3QYGqWkmH` |
 | 🌐 **Portal URL** | `https://cyberflow-rho.vercel.app/`|
-| **Youtube Video Link** | `https://cyberflow-rho.vercel.app/`|
+| **YouTube Demo Video Link** | `https://youtu.be/ghHpJxUP8_s`|
 
 ---
 
