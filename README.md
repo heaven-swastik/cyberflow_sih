@@ -20,8 +20,9 @@ Inspectors and judges can instantly log in to the administrative command portal 
 | --- | --- |
 | 👤 **Role** | **CyberFlow Administrator / Senior Investigator** |
 | 📧 **Email** | `admin@cyberflow.gov.in` |
-| 🔑 **Password** | `CyberFlow@2026` |
-| 🌐 **Portal URL** | `http://localhost:5173` (Frontend UI) · `http://localhost:5000` (Backend API) |
+| 🔑 **Password** | `zOSVWqn3QYGqWkmH` |
+| 🌐 **Portal URL** | `https://cyberflow-rho.vercel.app/`|
+| **Youtube Video Link** | `https://cyberflow-rho.vercel.app/`|
 
 ---
 
